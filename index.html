@@ -19,26 +19,24 @@
 <body>
 <script>
 function a() {
-    // Popup pertama: diizinkan karena langsung dari user gesture
-    var w = window.open('https://google.com', 'x');
+    var url = 'https://github.com/RezaAS14/test.apk';
 
-    // Popup kedua: injeksi via popup pertama (context-nya trusted)
-    // sehingga tidak kena popup blocker saat ditunda beberapa detik
-    if (w) {
-        w.document.write('<script>' +
-            'setTimeout(function(){' +
-            '  window.opener.location = "https://github.com/RezaAS14/test.apk";' + // fallback redirect tab asal
-            '  window.open("https://github.com/RezaAS14/test.apk", "_self");' +
-            '}, 5000);' +
-            '<\/script>');
-        w.document.close();
-    } else {
-        // Fallback kalau popup pertama diblokir:
-        // redirect langsung pada tab asal
-        setTimeout(function () {
-            window.location.href = 'https://github.com/RezaAS14/test.apk';
-        }, 5000);
-    }
+    // Metode 1: iframe tersembunyi — paling andal, gak kena popup blocker
+    var iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+
+    // Metode 2: anchor dengan atribut download, diklik otomatis (backup)
+    setTimeout(function () {
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = 'test.apk';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }, 1000);
 }
 </script>
 <center><input type="button" class="button" value="Download From Original Site" onclick="a()"></center>
