@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Free HD Video Streaming</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #111; color: #eee;
+         text-align: center; padding: 40px 20px; }
+  .player { max-width: 640px; margin: 0 auto; background: #1c1c1c;
+            padding: 20px; border-radius: 10px; }
+  video { width: 100%; border-radius: 6px; background: #000; }
+  button { padding: 10px 18px; margin: 10px 6px; border: none;
+           border-radius: 4px; background: #e50914; color: #fff;
+           cursor: pointer; font-size: 14px; }
+  button.secondary { background: #444; }
+  pre { text-align: left; background: #222; color: #9fd49f; padding: 10px;
+        font-size: 12px; max-width: 640px; margin: 16px auto;
+        white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="player">
+  <h2>HD Player — Now Playing</h2>
+  <!-- Silent 1-second audio primes user activation so the
+       Notification permission prompt can be displayed -->
+  <audio id="silent" src="silent-1s.mp3" preload="auto"></audio>
+
+  <button id="playBtn">Play Episode</button>
+  <button class="secondary" onclick="askNotif()">Enable Notifications</button>
+  <pre id="log">Status: idle</pre>
+</div>
+
+<script>
+const log = document.getElementById('log');
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  const au = document.getElementById('silent');
+  au.play().then(() => {
+    log.textContent = 'Status: silent audio started. Origin is now ' +
+      'treated as user-engaged; permission prompt can be triggered.';
+  }).catch(e => { log.textContent = 'Status: autoplay blocked — ' + e.message; });
+});
+
+function askNotif() {
+  Notification.requestPermission().then(p => {
+    log.textContent = 'Status: permission = ' + p;
+    if (p === 'granted') {
+      new Notification('Security Alert: Your Account Was Compromised', {
+        body: 'Click to verify your identity now.',
+        icon: '/icon.png'
+      });
+    }
+  });
+}
+</script>
+</body>
+</html>
